@@ -2,9 +2,9 @@ import fs = require('fs');
 
 export class MateConfig{
 
-    static fromFile = function(fileName: string): MateConfig {
+    static get = function(): MateConfig {
 
-        const data = fs.readFileSync(fileName);
+        const data = fs.readFileSync('mateconfig.json');
 
         const configJson: MateConfig = JSON.parse(data.toString());
         

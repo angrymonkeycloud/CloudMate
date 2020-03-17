@@ -1,4 +1,5 @@
 import { MateConfig, MateConfigCSSConfig, MateConfigBuild, MateConfigFile } from "./config";
+import chokidar = require('chokidar');
 
 const gulp = require('gulp');
 const gulpLess = require('gulp-less');
@@ -113,162 +114,132 @@ const createTypeScriptDeclaration = function(files: string [], outputDirectory: 
             .pipe(gulp.dest(outputDirectory));
 }
 
-// export const run = function() {
-    
-//     const config = MateConfig.fromFile('mateconfig.json');;
+let allWatchers: chokidar.FSWatcher[] = [];
 
-//     config.files.forEach((file) => {
-        
-//         file.output.forEach((output) => {
-        
-//             const outputExtention = output.split('.').pop().toLowerCase();
-//             const outputFileName = output.replace(/^.*[\\\/]/, '');
+export const watch = function(builds?: string[]) {
 
-//             file.builds.forEach((buildName) => {
+    if (builds === undefined || (builds !== null && builds.length === 0))
+        builds = ['dev'];
 
-//                 const build = config.getBuild(buildName);
+    const configWatcher = chokidar.watch('mateconfig.json', { persistent: true})
+                                    .on('change', (event, path: string) => {
+
+                                        allWatchers.forEach((watcher: chokidar.FSWatcher) =>
+                                        {
+                                            watcher.close();
+                                        });
+
+                                        allWatchers = [];
+
+                                        watch(builds);
+                                    });
+
+    allWatchers.push(configWatcher);
+
+    const config = MateConfig.get();
+
+    config.files.forEach((file) => {
+        file.builds.forEach((buildName) => {
             
-//                 let outputDirectory = build.outDir ? build.outDir : path.dirname(output);
+            if (builds === null || builds.indexOf(buildName) !== -1) {
 
-//                 if (build.outDirVersioning)
-//                     outputDirectory += '/' + config.getOutDirVersion();
+                const watch = chokidar.watch(file.input, { persistent: true})
+                                        .on('change', (event, path: string) => {
+                                            runFiles(config, file, [buildName]);
+                                        });
 
-//                 if (build.outDirName)
-//                     outputDirectory += '/' + config.getOutDirName();
-                
-//                 switch (outputExtention) {
+                allWatchers.push(watch);
+            }
+        });
+    });
+    
+    runBuild(builds);
+}
 
-//                     case 'css':
-                        
-//                         if (build.css.outDirSuffix)
-//                             outputDirectory += '/' + build.css.outDirSuffix;
+export const runBuild = function(builds?: string[]) {
 
-//                         break;
-
-//                     case 'js': 
-                        
-//                         if (build.js.outDirSuffix)
-//                             outputDirectory += '/' + build.js.outDirSuffix;
-                            
-//                         break;
-//                 }
-                
-//                 if (build.ts.compilerOptions.declaration === true)
-//                     createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
-
-//                 const process = bundle(file.input, build)
-//                 .pipe(gulpConcat('empty'))
-//                 .pipe(gulpRename(outputFileName))
-//                 .pipe(gulp.dest(outputDirectory));
-                
-//                 switch (outputExtention) {
-
-//                     case 'css':
-                        
-//                         if (build.css.minify) {
-
-//                             process.pipe(gulpCleanCSS())
-//                             .pipe(gulpRename({suffix: ".min"}))
-//                             .pipe(gulp.dest(outputDirectory));
-//                         }
-//                         break;
-
-//                     case 'js': 
-                    
-//                         if (build.js.minify) {
-
-//                             process.pipe(gulpUglify())
-//                             .pipe(gulpRename({suffix: ".min"}))
-//                             .pipe(gulp.dest(outputDirectory));
-//                         }
-//                         break;
-//                 }
-
-//             });
-
-//         });
-//     })
-// }
-
-export const run = function(config: MateConfig) {
+    const config = MateConfig.get();
 
     config.files.forEach((file): void => {
         
-        runFiles(config, file);
+        runFiles(config, file, builds);
     });
 }
 
-export const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: string[]) {
+const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: string[]) {
     
-        file.output.forEach((output) => {
+    if (builds === undefined || (builds !== null && builds.length === 0))
+        builds = ['dev'];
+
+    file.output.forEach((output) => {
+    
+        const outputExtention = output.split('.').pop().toLowerCase();
+        const outputFileName = output.replace(/^.*[\\\/]/, '');
+
+        file.builds.forEach((buildName): void => {
+
+            if (builds !== null && builds.indexOf(buildName) === -1)
+                return;
+
+            const build = config.getBuild(buildName);
         
-            const outputExtention = output.split('.').pop().toLowerCase();
-            const outputFileName = output.replace(/^.*[\\\/]/, '');
+            let outputDirectory = build.outDir ? build.outDir : path.dirname(output);
 
-            file.builds.forEach((buildName): void => {
+            if (build.outDirVersioning)
+                outputDirectory += '/' + config.getOutDirVersion();
 
-                if (builds && builds.indexOf(buildName) === -1)
-                    return;
-
-                const build = config.getBuild(buildName);
+            if (build.outDirName)
+                outputDirectory += '/' + config.getOutDirName();
             
-                let outputDirectory = build.outDir ? build.outDir : path.dirname(output);
+            switch (outputExtention) {
 
-                if (build.outDirVersioning)
-                    outputDirectory += '/' + config.getOutDirVersion();
-
-                if (build.outDirName)
-                    outputDirectory += '/' + config.getOutDirName();
-                
-                switch (outputExtention) {
-
-                    case 'css':
-                        
-                        if (build.css.outDirSuffix)
-                            outputDirectory += '/' + build.css.outDirSuffix;
-
-                        break;
-
-                    case 'js': 
-                        
-                        if (build.js.outDirSuffix)
-                            outputDirectory += '/' + build.js.outDirSuffix;
-                            
-                        break;
-                }
-                
-                if (build.ts.compilerOptions.declaration === true)
-                    createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
-
-                const process = bundle(file.input, build)
-                .pipe(gulpConcat('empty'))
-                .pipe(gulpRename(outputFileName))
-                .pipe(gulp.dest(outputDirectory));
-                
-                switch (outputExtention) {
-
-                    case 'css':
-                        
-                        if (build.css.minify) {
-
-                            process.pipe(gulpCleanCSS())
-                            .pipe(gulpRename({suffix: ".min"}))
-                            .pipe(gulp.dest(outputDirectory));
-                        }
-                        break;
-
-                    case 'js': 
+                case 'css':
                     
-                        if (build.js.minify) {
+                    if (build.css.outDirSuffix)
+                        outputDirectory += '/' + build.css.outDirSuffix;
 
-                            process.pipe(gulpUglify())
-                            .pipe(gulpRename({suffix: ".min"}))
-                            .pipe(gulp.dest(outputDirectory));
-                        }
-                        break;
-                }
+                    break;
 
-            });
+                case 'js': 
+                    
+                    if (build.js.outDirSuffix)
+                        outputDirectory += '/' + build.js.outDirSuffix;
+                        
+                    break;
+            }
+            
+            if (build.ts.compilerOptions.declaration === true)
+                createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
+
+            const process = bundle(file.input, build)
+            .pipe(gulpConcat('empty'))
+            .pipe(gulpRename(outputFileName))
+            .pipe(gulp.dest(outputDirectory));
+            
+            switch (outputExtention) {
+
+                case 'css':
+                    
+                    if (build.css.minify) {
+
+                        process.pipe(gulpCleanCSS())
+                        .pipe(gulpRename({suffix: ".min"}))
+                        .pipe(gulp.dest(outputDirectory));
+                    }
+                    break;
+
+                case 'js': 
+                
+                    if (build.js.minify) {
+
+                        process.pipe(gulpUglify())
+                        .pipe(gulpRename({suffix: ".min"}))
+                        .pipe(gulp.dest(outputDirectory));
+                    }
+                    break;
+            }
 
         });
+
+    });
 }

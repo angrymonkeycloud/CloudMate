@@ -11,15 +11,6 @@ gulp.task('index', function() {
         .pipe(gulp.dest('test'));
 });
 
-gulp.task('watch', function() {
-
-    return gulp.src('src/watch.ts')
-        .pipe(gulpSourcemaps.init())
-        .pipe(ts())
-        .pipe(gulpSourcemaps.write())
-        .pipe(gulp.dest('test'));
-});
-
 gulp.task('main', function() {
 
     return gulp.src('src/main.ts')
@@ -47,10 +38,9 @@ gulp.task('clean', function() {
         .pipe(gulp.dest('test'));
 });
 
-gulp.task('default', gulp.series('index', 'clean', 'main', 'config', 'watch'));
+gulp.task('default', gulp.series('index', 'clean', 'main', 'config'));
 
-gulp.watch("src/config.ts", gulp.series("config", "main", "index", "watch"));
-gulp.watch("src/main.ts", gulp.series("main", "index", "watch"));
+gulp.watch("src/config.ts", gulp.series("config", "main", "index"));
+gulp.watch("src/main.ts", gulp.series("main", "index"));
 gulp.watch("src/index.ts", gulp.series("index"));
-gulp.watch("src/watch.ts", gulp.series("watch"));
 gulp.watch("src/clean.ts", gulp.series("clean"));
