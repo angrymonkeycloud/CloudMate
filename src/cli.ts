@@ -21,17 +21,24 @@ const getPackageInfo = function(info: string){
     return matePackage[info];
 }
 
+// Args
 
 const args = minimist(process.argv.slice(2));
 
+const versionArgs = args.v || args.version;
+const helpArgs = args.h || args.help;
+const watchArgs = args.w || args.watch;
+const allArgs = args.a || args.all;
+const builds = allArgs === true? null : args._;
+
 // Version
 
-if (args.v || args.version)
+if (versionArgs)
     console.log(getPackageInfo('version'));
 
 // Help
 
-if (args.h || args.help){
+if (helpArgs){
  
     console.log('Usage: mate [builds] [options]');
     console.log('mate\t\t\t will run dev build only');
@@ -44,11 +51,9 @@ if (args.h || args.help){
     console.log('-w, --watch\t\t watch defined inputs under the specified build(s)');
 }
 
-// Watch
-const watchArgs = args.w || args.watch;
-const allArgs = args.a || args.all;
-const builds = allArgs === true? null : args._;
-
-if (watchArgs)
-    watch(builds);
-else runBuild(builds);
+if (!versionArgs && !helpArgs)
+{
+    if (watchArgs)
+        watch(builds);
+    else runBuild(builds);
+}

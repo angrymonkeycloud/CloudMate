@@ -3,7 +3,8 @@
 ## CLI info
 
 cd test
-node index.js -h
+
+node cli.js -h
 
 ## Clear devFolder and dist
 

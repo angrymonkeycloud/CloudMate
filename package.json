@@ -1,10 +1,10 @@
 {
     "name": "cloudmate",
-    "version": "0.2.0",
+    "version": "0.5.0",
     "description": "Process, using gulp, to compile, optimize, and distribute static files (styles, scripts, and images).",
-    "main": "test/index.js",
+    "main": "test/cli.js",
     "bin": {
-        "mate": "test/index.js"
+        "mate": "test/cli.js"
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"

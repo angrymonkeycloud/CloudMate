@@ -18,6 +18,8 @@
         {
             "name": "dist",
             "outDir": "dist",
+            "outDirVersioning": true,
+            "outDirName": true,
             "css": {
                 "outDirSuffix": "css",
                 "minify": true,
