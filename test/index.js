@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+"use strict";
+exports.__esModule = true;
+var main_1 = require("./main");
+var config_1 = require("./config");
+var config = config_1.MateConfig.fromFile('mateconfig.json');
+;
+main_1.run(config);
+
+//# sourceMappingURL=data:application/json;charset=utf8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImluZGV4LnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7OztBQUVBLCtCQUE2QjtBQUM3QixtQ0FBc0M7QUFFdEMsSUFBTSxNQUFNLEdBQUcsbUJBQVUsQ0FBQyxRQUFRLENBQUMsaUJBQWlCLENBQUMsQ0FBQztBQUFBLENBQUM7QUFFdkQsVUFBRyxDQUFDLE1BQU0sQ0FBQyxDQUFDIiwiZmlsZSI6ImluZGV4LmpzIiwic291cmNlc0NvbnRlbnQiOlsiIyEvdXNyL2Jpbi9lbnYgbm9kZVxyXG5cclxuaW1wb3J0IHsgcnVuIH0gZnJvbSBcIi4vbWFpblwiO1xyXG5pbXBvcnQgeyBNYXRlQ29uZmlnIH0gZnJvbSBcIi4vY29uZmlnXCI7XHJcbiAgICBcclxuY29uc3QgY29uZmlnID0gTWF0ZUNvbmZpZy5mcm9tRmlsZSgnbWF0ZWNvbmZpZy5qc29uJyk7O1xyXG5cclxucnVuKGNvbmZpZyk7Il19

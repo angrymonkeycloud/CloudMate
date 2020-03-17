@@ -1,0 +1,61 @@
+{
+    "builds": [{
+            "name": "dev",
+            "css": {
+                "minify": false,
+                "sourceMap": true
+            },
+            "js": {
+                "minify": false,
+                "sourceMap": true
+            },
+            "ts": {
+                "compilerOptions": {
+                    "declaration": true
+                }
+            }
+        },
+        {
+            "name": "dist",
+            "outDir": "dist",
+            "css": {
+                "outDirSuffix": "css",
+                "minify": true,
+                "sourceMap": false
+            },
+            "js": {
+                "outDirSuffix": "js",
+                "minify": true,
+                "sourceMap": false
+            },
+            "ts": {
+                "compilerOptions": {
+                    "declaration": true
+                }
+            }
+        }
+    ],
+    "files": [{
+            "output": ["devfolder/yess.css"],
+            "input": [
+                "files/cssStyle.css",
+                "files/style.less",
+                "files/style2.less"
+            ],
+            "builds": ["dev", "dist"]
+        },
+        {
+            "output": ["devfolder/js/site.js"],
+            "input": [
+                "files/script.ts",
+                "files/script2.ts"
+            ],
+            "builds": ["dev", "dist"]
+        },
+        {
+            "output": ["README.md"],
+            "input": ["README.md"],
+            "builds": ["dist"]
+        }
+    ]
+}

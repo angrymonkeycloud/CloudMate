@@ -1,0 +1,18 @@
+{
+    "files": [{
+            "output": ["devfolder/yess.css"],
+            "input": [
+                "files/cssStyle.css",
+                "files/style.less",
+                "files/style2.less"
+            ]
+        },
+        {
+            "output": ["devfolder/js/site.js"],
+            "input": [
+                "files/script.ts",
+                "files/script2.ts"
+            ]
+        }
+    ]
+}
