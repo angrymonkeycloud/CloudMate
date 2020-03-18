@@ -1,4 +1,4 @@
-import { MateConfig, MateConfigCSSConfig, MateConfigBuild, MateConfigFile } from "./config";
+import { MateConfig, MateConfigCSSConfig, MateConfigBuild, MateConfigFile, MateConfigTSConfig } from "./config";
 import chokidar = require('chokidar');
 
 const gulp = require('gulp');
@@ -97,7 +97,8 @@ const compile = function(files: string[], extention: string, build: MateConfigBu
             return process.pipe(gulpConcat('empty'));
 
         case 'd.ts':
-            return process.pipe(gulpTs({ declaration: true }));
+                
+            return process.pipe(gulpTs(MateConfigTSConfig.declarationCompilerOptions(build.ts.compilerOptions)));
     }
 
     return process;

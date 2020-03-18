@@ -203,16 +203,22 @@ export class MateConfigTSConfig extends MateConfigBaseConfig{
 
     compilerOptions?: tsCompilerOptions;
 
+    static declarationCompilerOptions(compilerOptions?: tsCompilerOptions): tsCompilerOptions{
+
+        var value:tsCompilerOptions = {};
+
+        for (const key in compilerOptions)
+            value[key] = compilerOptions[key];
+    
+        value.declaration = true;
+            
+        return value ;
+    }
+
     static setUndefined(ts: MateConfigTSConfig): void {
     
         if (ts.compilerOptions === undefined)
             ts.compilerOptions = { };
-
-        // ignore values
-        // ts.compilerOptions.declaration = false;
-        // ts.compilerOptions.sourceMap = false;
-        // ts.compilerOptions.outDir = undefined;
-        // ts.compilerOptions.outFile = undefined;
     }
 }
 

@@ -27,11 +27,17 @@
             "js": {
                 "outDirSuffix": "js",
                 "minify": true,
-                "sourceMap": false
+                "sourceMap": false,
+                "declaration": true
             },
             "ts": {
-                "declaration": true,
-                "compilerOptions": {}
+                "compilerOptions": {
+                    "noImplicitAny": false,
+                    "noEmitOnError": false,
+                    "removeComments": true,
+                    "target": "es5",
+                    "lib": ["ES2015", "DOM"]
+                }
             }
         }
     ],
