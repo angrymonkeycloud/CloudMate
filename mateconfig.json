@@ -3,12 +3,8 @@
         "name": "dev",
         "js": {
             "minify": false,
-            "sourceMap": true
-        },
-        "ts": {
-            "compilerOptions": {
-                "declaration": false
-            }
+            "sourceMap": true,
+            "declaration": false
         }
     }],
     "files": [{

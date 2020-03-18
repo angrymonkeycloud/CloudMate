@@ -170,15 +170,14 @@ export const watch = function(builds?: string[]) {
 
 export const runBuild = function(builds?: string[]) {
 
-    console.log('started at ' + new Date().toTimeString());
+    console.log('executed at ' + new Date().toTimeString());
+    
     const config = MateConfig.get();
 
     config.files.forEach((file): void => {
         
         runFiles(config, file, builds);
     });
-
-    console.log('ended at ' + new Date().toTimeString());
 }
 
 const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: string[]) {

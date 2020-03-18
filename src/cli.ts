@@ -5,12 +5,9 @@ import fs = require('fs');
 import path = require('path');
 import minimist = require('minimist');
 
-
-
-
 let matePackage: object;
 const setPackage = function(){
-    matePackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json')).toString());
+    matePackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json')).toString());
 }
 
 const getPackageInfo = function(info: string){
