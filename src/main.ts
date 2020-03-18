@@ -3,6 +3,7 @@ import chokidar = require('chokidar');
 
 const gulp = require('gulp');
 const gulpLess = require('gulp-less');
+const gulpSass = require('gulp-sass');
 const gulpRename = require('gulp-rename');
 const gulpConcat = require("gulp-concat");
 const gulpTs = require("gulp-typescript");
@@ -65,6 +66,18 @@ const compile = function(files: string[], extention: string, build: MateConfigBu
                 process = process.pipe(gulpSourcemaps.init());
 
             process = process.pipe(gulpLess());    
+
+            if (build.css.sourceMap)
+                process = process.pipe(gulpSourcemaps.write());
+
+            return process.pipe(gulpConcat('empty'));
+
+        case 'scss':
+
+            if (build.css.sourceMap)
+                process = process.pipe(gulpSourcemaps.init());
+
+            process = process.pipe(gulpSass().on('error', gulpSass.logError));    
 
             if (build.css.sourceMap)
                 process = process.pipe(gulpSourcemaps.write());

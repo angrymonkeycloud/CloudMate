@@ -1,0 +1,8 @@
+.saasParentClasst {
+    .saasChildClass {
+        color: transparent;
+    }
+    &.saasSiblingClass {
+        background-color: red;
+    }
+}

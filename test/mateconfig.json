@@ -42,7 +42,8 @@
             "input": [
                 "files/cssStyle.css",
                 "files/style.less",
-                "files/style2.less"
+                "files/style2.less",
+                "files/saasFile.scss"
             ],
             "builds": ["dev", "dist"]
         },
