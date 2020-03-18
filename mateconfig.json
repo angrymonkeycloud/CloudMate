@@ -1,0 +1,33 @@
+{
+    "builds": [{
+        "name": "dev",
+        "js": {
+            "minify": false,
+            "sourceMap": true
+        },
+        "ts": {
+            "compilerOptions": {
+                "declaration": false
+            }
+        }
+    }],
+    "files": [{
+        "input": ["src/clean.ts"],
+        "output": ["test/clean.js"]
+    }, {
+        "input": ["src/config.ts"],
+        "output": ["test/config.js",
+            "dist/config.js"
+        ]
+    }, {
+        "input": ["src/main.ts"],
+        "output": ["test/main.js",
+            "dist/main.js"
+        ]
+    }, {
+        "input": ["src/cli.ts"],
+        "output": ["test/cli.js",
+            "dist/cli.js"
+        ]
+    }]
+}
