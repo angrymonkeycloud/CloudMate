@@ -1,6 +1,6 @@
 {
     "builds": [{
-            dsadas "name": "dev",
+            "name": "dev",
             "css": {
                 "minify": false,
                 "sourceMap": true

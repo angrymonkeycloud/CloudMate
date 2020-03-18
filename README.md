@@ -63,11 +63,14 @@ Default build's name is **dev**, so if the developer didn't specify the build of
             },
             "js": {
                 "minify": false,
-                "sourceMap": true
+                "sourceMap": true,
+                "declaration": true
             },
             "ts": {
                 "compilerOptions": { // 1.
-                    "declaration": true
+                    "target": "es5",
+                    "noEmitOnError": false,
+                    "noImplicitAny": false,
                 }
             }
         },
@@ -101,7 +104,7 @@ Default build's name is **dev**, so if the developer didn't specify the build of
 accepts tsconfig compiler options <https://www.typescriptlang.org/docs/handbook/compiler-options.html>
 
 * ignore
-    * sourceMap (it will be defined under js options).
+    * declaratio and sourceMap (will be defined under js options).
     * outDir, outFile, and other similar options.
 
 **2. outDir**

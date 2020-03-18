@@ -10,9 +10,8 @@
                 "sourceMap": true
             },
             "ts": {
-                "compilerOptions": {
-                    "declaration": true
-                }
+                "declaration": true,
+                "compilerOptions": {}
             }
         },
         {
@@ -31,9 +30,8 @@
                 "sourceMap": false
             },
             "ts": {
-                "compilerOptions": {
-                    "declaration": true
-                }
+                "declaration": true,
+                "compilerOptions": {}
             }
         }
     ],

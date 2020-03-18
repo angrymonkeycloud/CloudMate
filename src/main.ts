@@ -89,7 +89,7 @@ const compile = function(files: string[], extention: string, build: MateConfigBu
             if (build.js.sourceMap)
                 process = process.pipe(gulpSourcemaps.init());
 
-            process = process.pipe(gulpTs());
+            process = process.pipe(gulpTs(build.ts.compilerOptions));
 
             if (build.js.sourceMap)
                 process = process.pipe(gulpSourcemaps.write());
@@ -97,8 +97,7 @@ const compile = function(files: string[], extention: string, build: MateConfigBu
             return process.pipe(gulpConcat('empty'));
 
         case 'd.ts':
-            return process
-                    .pipe(gulpTs(build.ts.compilerOptions));
+            return process.pipe(gulpTs({ declaration: true }));
     }
 
     return process;
@@ -171,12 +170,15 @@ export const watch = function(builds?: string[]) {
 
 export const runBuild = function(builds?: string[]) {
 
+    console.log('started at ' + new Date().toTimeString());
     const config = MateConfig.get();
 
     config.files.forEach((file): void => {
         
         runFiles(config, file, builds);
     });
+
+    console.log('ended at ' + new Date().toTimeString());
 }
 
 const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: string[]) {
@@ -221,7 +223,7 @@ const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: str
                     break;
             }
             
-            if (build.ts.compilerOptions.declaration === true)
+            if (build.js.declaration === true)
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
 
             const process = bundle(file.input, build)

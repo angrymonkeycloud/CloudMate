@@ -184,6 +184,7 @@ export class MateConfigJSConfig extends MateConfigBaseConfig{
 
     minify?: boolean;
     sourceMap?: boolean;
+    declaration?: boolean;
 
     static setUndefined(js: MateConfigJSConfig): void {
     
@@ -192,6 +193,9 @@ export class MateConfigJSConfig extends MateConfigBaseConfig{
     
         if (js.sourceMap === undefined)
             js.sourceMap = true;
+    
+        if (js.declaration === undefined)
+            js.declaration = true;
     }
 }
 
@@ -199,14 +203,23 @@ export class MateConfigTSConfig extends MateConfigBaseConfig{
 
     compilerOptions?: tsCompilerOptions;
 
-
     static setUndefined(ts: MateConfigTSConfig): void {
     
         if (ts.compilerOptions === undefined)
-            ts.compilerOptions = {  declaration: true };
+            ts.compilerOptions = { };
+
+        // ignore values
+        // ts.compilerOptions.declaration = false;
+        // ts.compilerOptions.sourceMap = false;
+        // ts.compilerOptions.outDir = undefined;
+        // ts.compilerOptions.outFile = undefined;
     }
 }
 
 interface tsCompilerOptions{
-    declaration?: boolean;
+    // to be ignored
+    declaration?: boolean,
+    sourceMap?: boolean,
+    outDir?: string,
+    outFile?: string
 }
