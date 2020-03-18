@@ -2,16 +2,17 @@
     "files": [{
             "output": ["devfolder/yess.css"],
             "input": [
-                "files/cssStyle.css",
-                "files/style.less",
-                "files/style2.less"
+                "files/cssFile.css",
+                "files/lessFile1.less",
+                "files/lessFile2.less",
+                "files/saasFile.scss"
             ]
         },
         {
             "output": ["devfolder/js/site.js"],
             "input": [
-                "files/script.ts",
-                "files/script2.ts"
+                "files/tsFile1.ts",
+                "files/tsFile2.ts"
             ]
         }
     ]
