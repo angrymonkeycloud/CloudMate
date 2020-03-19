@@ -15,7 +15,9 @@ module.exports = function () {
         // * This allows us to modify the vinyl file in memory and prevents the need to write back to the file system.
 
         let content = 'var exports = {};\n' + transformedFile.contents.toString();
-        content = CloudMateWebCleanJS.updateDefaultVariables(content);
+        
+        content = CloudMateWebCleanJS.cleanLines(content);
+        content = CloudMateWebCleanJS.cleanPrefixes(content);
 
         const lines = content.split('\n');
 
@@ -57,34 +59,39 @@ module.exports = function () {
 
 class CloudMateWebCleanJS {
 
-    static updateDefaultVariables(content: string): string{
+    static cleanLines(content: string): string{
 
-        content = content.replace(/(_)\d(.default)/gmi, '');
+        const startWithValues = [
+            'import '
+        ];
 
-        return content;
+        let result = '';
+
+        for(const line of content.split('\n')){
+         
+            let safe = true;
+            
+            for(const startWith of startWithValues)
+                if (line.startsWith(startWith))
+                    safe = false;
+            
+            if (safe)
+                result += line + '\n';
+        }
+
+        return result;
     }
 
-    // static removeNonDependanciesLines(content: string): string{
+    static cleanPrefixes(content: string): string{
 
-    //     const startWithValues = [
-    //         'Object.defineProperty(exports',
-    //         'exports.'
-    //     ];
+        const prefixesValues = [
+            'export default ',
+            'export '
+        ];
 
-    //     let result = '';
-
-    //     for(const line of content.split('\n')){
-         
-    //         let safe = true;
-            
-    //         for(const startWith of startWithValues)
-    //             if (line.startsWith(startWith))
-    //                 safe = false;
-            
-    //         if (safe)
-    //             result += line + '\n';
-    //     }
-
-    //     return result;
-    // }
+        for(const prefix of prefixesValues)
+            content = content.replace(new RegExp('^(' + prefix + ')|[[:blank:]]+(' + prefix + ')', 'gmi'), '');
+        
+        return content;
+    }
 }

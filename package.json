@@ -1,6 +1,6 @@
 {
     "name": "cloudmate",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Process, using gulp, to compile, optimize, and distribute static files (styles, scripts, and images).",
     "main": "dist/cli.js",
     "bin": {
@@ -12,7 +12,6 @@
     "author": "Angry Monkey Cloud",
     "license": "POST License",
     "devDependencies": {
-        "@types/gulp": "^4.0.6",
         "@types/gulp-less": "0.0.31",
         "@types/minimist": "^1.2.0",
         "@types/through2": "^2.0.34",

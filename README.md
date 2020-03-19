@@ -76,6 +76,7 @@ Default build's name is **dev**, so if the developer didn't specify the build of
                     "target": "es5",
                     "noEmitOnError": false,
                     "noImplicitAny": false,
+                    "module": "ES6"
                 }
             }
         },
@@ -112,7 +113,7 @@ Default build's name is **dev**, so if the developer didn't specify the build of
 **webClean**
 removes unwanted JavaScript codes such as require(…). Make sure you’ve bundled all required files or added them to the html in the right order
 
-> **Important:** Web Clean is in early staging development
+> **Important:** Web Clean is in early staging development, and it requires module ES6 and highigher under ts compilerOptions.
 
 **ts compilerOptions**
 accepts tsconfig compiler options <https://www.typescriptlang.org/docs/handbook/compiler-options.html>

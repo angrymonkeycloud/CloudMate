@@ -5,7 +5,8 @@ module.exports = function () {
     return through.obj(function (vinylFile, encoding, callback) {
         var transformedFile = vinylFile.clone();
         var content = 'var exports = {};\n' + transformedFile.contents.toString();
-        content = CloudMateWebCleanJS.updateDefaultVariables(content);
+        content = CloudMateWebCleanJS.cleanLines(content);
+        content = CloudMateWebCleanJS.cleanPrefixes(content);
         var lines = content.split('\n');
         var removables_Requires = [];
         for (var i = 0; i < lines.length; i++) {
@@ -32,8 +33,33 @@ module.exports = function () {
 var CloudMateWebCleanJS = (function () {
     function CloudMateWebCleanJS() {
     }
-    CloudMateWebCleanJS.updateDefaultVariables = function (content) {
-        content = content.replace(/(_)\d(.default)/gmi, '');
+    CloudMateWebCleanJS.cleanLines = function (content) {
+        var startWithValues = [
+            'import '
+        ];
+        var result = '';
+        for (var _i = 0, _a = content.split('\n'); _i < _a.length; _i++) {
+            var line = _a[_i];
+            var safe = true;
+            for (var _b = 0, startWithValues_1 = startWithValues; _b < startWithValues_1.length; _b++) {
+                var startWith = startWithValues_1[_b];
+                if (line.startsWith(startWith))
+                    safe = false;
+            }
+            if (safe)
+                result += line + '\n';
+        }
+        return result;
+    };
+    CloudMateWebCleanJS.cleanPrefixes = function (content) {
+        var prefixesValues = [
+            'export default ',
+            'export '
+        ];
+        for (var _i = 0, prefixesValues_1 = prefixesValues; _i < prefixesValues_1.length; _i++) {
+            var prefix = prefixesValues_1[_i];
+            content = content.replace(new RegExp('^(' + prefix + ')|[[:blank:]]+(' + prefix + ')', 'gmi'), '');
+        }
         return content;
     };
     return CloudMateWebCleanJS;

@@ -4,5 +4,7 @@ class Test1 {
     FirstProperty: string;
 }
 
-const t = new Test1();
-export default  t;
+export const testVariable = new Test1();
+
+const defaultVariable = new Test1();
+export default defaultVariable;
