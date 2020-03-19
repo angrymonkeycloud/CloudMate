@@ -13,6 +13,7 @@ const merge2 = require('merge2');
 const gulpCleanCSS = require('gulp-clean-css');
 const gulpFilter = require('gulp-filter-each');
 const path = require('path');
+const webClean = require('./webcleanjs');
 
 const bundle = function(files: string[], build: MateConfigBuild): any {
 
@@ -226,10 +227,20 @@ const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: str
             if (build.js.declaration === true)
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
 
-            const process = bundle(file.input, build)
-            .pipe(gulpConcat('empty'))
-            .pipe(gulpRename(outputFileName))
-            .pipe(gulp.dest(outputDirectory));
+                let process = bundle(file.input, build)
+                .pipe(gulpConcat('empty'))
+            
+                switch (outputExtention) {
+    
+                    case 'js': 
+                    
+                        if (build.js.webClean)
+                            process = process.pipe(webClean());
+                        break;
+                }
+
+                process = process.pipe(gulpRename(outputFileName))
+                .pipe(gulp.dest(outputDirectory));
             
             switch (outputExtention) {
 

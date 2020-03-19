@@ -14,6 +14,7 @@ var merge2 = require('merge2');
 var gulpCleanCSS = require('gulp-clean-css');
 var gulpFilter = require('gulp-filter-each');
 var path = require('path');
+var webClean = require('./webcleanjs');
 var bundle = function (files, build) {
     var process = [];
     var groupFilesExtention = '';
@@ -148,8 +149,14 @@ var runFiles = function (config, file, builds) {
             if (build.js.declaration === true)
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
             var process = bundle(file.input, build)
-                .pipe(gulpConcat('empty'))
-                .pipe(gulpRename(outputFileName))
+                .pipe(gulpConcat('empty'));
+            switch (outputExtention) {
+                case 'js':
+                    if (build.js.webClean)
+                        process = process.pipe(webClean());
+                    break;
+            }
+            process = process.pipe(gulpRename(outputFileName))
                 .pipe(gulp.dest(outputDirectory));
             switch (outputExtention) {
                 case 'css':

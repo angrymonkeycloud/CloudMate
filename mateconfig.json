@@ -48,5 +48,9 @@
         "input": ["src/cli.ts"],
         "output": ["test/cli.js"],
         "builds": ["dev", "dist"]
+    }, {
+        "input": ["src/webcleanjs.ts"],
+        "output": ["test/webcleanjs.js"],
+        "builds": ["dev", "dist"]
     }]
 }

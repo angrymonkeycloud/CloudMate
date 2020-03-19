@@ -185,6 +185,7 @@ export class MateConfigJSConfig extends MateConfigBaseConfig{
     minify?: boolean;
     sourceMap?: boolean;
     declaration?: boolean;
+    webClean?: boolean;
 
     static setUndefined(js: MateConfigJSConfig): void {
     
@@ -196,6 +197,9 @@ export class MateConfigJSConfig extends MateConfigBaseConfig{
     
         if (js.declaration === undefined)
             js.declaration = true;
+
+        if (js.webClean === undefined)
+            js.webClean = false;
     }
 }
 

@@ -143,6 +143,8 @@ var MateConfigJSConfig = (function (_super) {
             js.sourceMap = true;
         if (js.declaration === undefined)
             js.declaration = true;
+        if (js.webClean === undefined)
+            js.webClean = false;
     };
     return MateConfigJSConfig;
 }(MateConfigBaseConfig));

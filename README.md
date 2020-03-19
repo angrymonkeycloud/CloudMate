@@ -13,7 +13,9 @@ Compile, merge, optimize, and distribute static files including: TypeScript, Jav
 
 ### Install globally from npm
 
-`> npm i -g cloudmate`
+```bash
+npm i -g cloudmate
+```
 
 ## Simple scenario
 
@@ -37,7 +39,9 @@ Compile, merge, optimize, and distribute static files including: TypeScript, Jav
 
 Run mate from the terminal
 
-`> mate`
+```bash
+mate
+```
 
 ## Configuration
 
@@ -55,7 +59,7 @@ Default build's name is **dev**, so if the developer didn't specify the build of
 {
     "builds":
     [
-        { // Default Build
+        {
             "name": "dev",
             "css": {
                 "minify": false,
@@ -64,23 +68,24 @@ Default build's name is **dev**, so if the developer didn't specify the build of
             "js": {
                 "minify": false,
                 "sourceMap": true,
-                "declaration": true
+                "declaration": true,
+                "webClean": true
             },
             "ts": {
-                "compilerOptions": { // 1.
+                "compilerOptions": {
                     "target": "es5",
                     "noEmitOnError": false,
                     "noImplicitAny": false,
                 }
             }
         },
-        { // Distribution Build
+        {
             "name": "dist",
-            "outDir": "dist", // 2.
-            "outDirVersioning": true, // 3.
-            "outDirName": true, // 4.
+            "outDir": "dist",
+            "outDirVersioning": true,
+            "outDirName": true,
             "css": {
-                "outDirSuffix": "css", // 5.
+                "outDirSuffix": "css",
                 "minify": true,
                 "sourceMap": false
             },
@@ -100,31 +105,40 @@ Default build's name is **dev**, so if the developer didn't specify the build of
 }
 ```
 
-**1. ts compilerOptions**
+> First build is development build (default)
+
+> Second build is distribution build
+
+**webClean**
+removes unwanted JavaScript codes such as require(…). Make sure you’ve bundled all required files or added them to the html in the right order
+
+> **Important:** Web Clean is in early staging development
+
+**ts compilerOptions**
 accepts tsconfig compiler options <https://www.typescriptlang.org/docs/handbook/compiler-options.html>
 
 * ignore
     * declaratio and sourceMap (will be defined under js options).
     * outDir, outFile, and other similar options.
 
-**2. outDir**
+**outDir**
 overwrites the output directory.
 
-**3. outDirVersioning**
+**outDirVersioning**
 creates a sub directory under the outDir which will be named under the project version
 
 * outDir should be specified to take effect.
 * project version will try to find "version" under the mateconfig.json.
 * if not found will try to find it under the "package.json".
 
-**4. outDirName**
+**outDirName**
 creates a sub directory under the outDir (and under the version folder if specified) which will be named under the project name
 
 * outDir should be specified to take effect.
 * project name will try to find "name" under the mateconfig.json.
 * if not found will try to find it under the "package.json".
 
-**5. outDirSuffix**
+**outDirSuffix**
 creates a sub directory for the specified file type.
 
 ### Files
@@ -134,13 +148,13 @@ creates a sub directory for the specified file type.
     "builds": [...],
     "files":
     [
-        { // 1.
+        {
             "output": ["test/temp.txt", "test/temp2.txt"],
             "input": [
                 "files/temp1.txt"
             ]
         },
-        { // 2.
+        {
             "output": ["test/site.css"],
             "input": [
                 "files/cssFile.css",
@@ -150,7 +164,7 @@ creates a sub directory for the specified file type.
             ],
             "builds": ["dev", "dist"]
         },
-        { // 2.
+        {
             "output": ["test/site.js"],
             "input": [
                 "files/tsFile1.ts",
@@ -158,7 +172,7 @@ creates a sub directory for the specified file type.
             ],
             "builds": ["dev", "dist"]
         },
-        { // 3.
+        {
             "output": ["README.md"],
             "input": ["README.md"],
             "builds": ["dist"]
@@ -167,17 +181,17 @@ creates a sub directory for the specified file type.
 }
 ```
 
-**1. Single input to Multiple outputs**
+**First File Definition: Single input to Multiple outputs**
 
 * Single input which creates a duplicate copy of the file into 2 outputs.
 * Build is not specified so it will use the **dev** build (the default build configuration dev build is specified).
 
-**2. Multiple inputs to Single output**
+**Second File Definition: Multiple inputs to Single output**
 
 * Multiple inputs with multiple inputs formats which will be compiled and merge into a single output.
 * It will run using **dev** and **dist** builds.
 
-**2. Single inputs to Single output**
+**Third File Definition: Single inputs to Single output**
 
 * Single input to be cloned into another path, the new directory is specified in the **dist** build.
 * It will run using the **dist** build only.
@@ -188,36 +202,52 @@ And of course, it could be multiple inputs into multiple outputs.
 
 ### Usage
 
-`> mate [builds] [options]`
+```bash
+mate [builds] [options]
+```
 
 ### General
 
 Run **dev** build only
 
-`> mate`
+```bash
+mate
+```
 
 run **dist** build only
 
-`> mate dist`
+```bash
+mate dist
+```
 
 run **dev** and **dist** and **abc** builds
 
-`> mate dev dist abc`
+```bash
+mate dev dist abc
+```
 
 ### Options
 
 Print Cloud Mate version
 
-`-v, --version`
+```bash
+-v, --version
+```
 
 Print cli information
 
-`-h, --help`
+```bash
+-h, --help
+```
 
 Run all builds
 
-`-a, --all`
+```bash
+-a, --all
+```
 
 Watch input files
 
-`-w, --watch`
+```bash
+-w, --watch
+```
