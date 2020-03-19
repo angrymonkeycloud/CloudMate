@@ -28,7 +28,8 @@
                 "outDirSuffix": "js",
                 "minify": true,
                 "sourceMap": false,
-                "declaration": true
+                "declaration": true,
+                "webClean": true
             },
             "ts": {
                 "compilerOptions": {

@@ -14,20 +14,16 @@ module.exports = function () {
         // * contents can only be a Buffer, Stream, or null
         // * This allows us to modify the vinyl file in memory and prevents the need to write back to the file system.
 
-        const lines = transformedFile.contents.toString().split('\n');
+        let content = 'var exports = {};\n' + transformedFile.contents.toString();
+        content = CloudMateWebCleanJS.updateDefaultVariables(content);
+
+        const lines = content.split('\n');
 
         const removables_Requires = [];
-        const removables_Lines = [];
-
-        console.log('--------------------------');
-        console.log('start ********************');
-        console.log('--------------------------');
         
         for (let i = 0; i < lines.length; i++) {
 
             const line = lines[i];
-
-            // console.log(line);
 
             if (line.indexOf(' require(') === -1)
                 continue;
@@ -40,8 +36,6 @@ module.exports = function () {
                 removables_Requires.push(prefix + '.');
         }
 
-        let content = 'var exports = {};\n' + transformedFile.contents.toString();
-
         removables_Requires.forEach(function (value) {
 
             if (value.indexOf('=') === 0)
@@ -53,12 +47,6 @@ module.exports = function () {
                 content = content.replace(new RegExp(value.trim(), 'gi'), '');
         });
 
-        content = CloudMateWebCleanJS.removeNonDependanciesLines(content);
-
-        console.log('--------------------------');
-        console.log('end **********************');
-        console.log('--------------------------');
-
         transformedFile.contents = new Buffer(content);
 
         // 3. pass along transformed file for use in next `pipe()`
@@ -69,27 +57,34 @@ module.exports = function () {
 
 class CloudMateWebCleanJS {
 
-    static removeNonDependanciesLines(content: string): string{
+    static updateDefaultVariables(content: string): string{
 
-        const startWithValues = [
-            'AAObject.defineProperty(exports',
-            'AAexports.'
-        ];
+        content = content.replace(/(_)\d(.default)/gmi, '');
 
-        let result = '';
-
-        for(const line of content.split('\n')){
-         
-            let safe = true;
-            
-            for(const startWith of startWithValues)
-                if (line.startsWith(startWith))
-                    safe = false;
-            
-            if (safe)
-                result += line + '\n';
-        }
-
-        return result;
+        return content;
     }
+
+    // static removeNonDependanciesLines(content: string): string{
+
+    //     const startWithValues = [
+    //         'Object.defineProperty(exports',
+    //         'exports.'
+    //     ];
+
+    //     let result = '';
+
+    //     for(const line of content.split('\n')){
+         
+    //         let safe = true;
+            
+    //         for(const startWith of startWithValues)
+    //             if (line.startsWith(startWith))
+    //                 safe = false;
+            
+    //         if (safe)
+    //             result += line + '\n';
+    //     }
+
+    //     return result;
+    // }
 }
