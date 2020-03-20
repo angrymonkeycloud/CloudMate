@@ -4,7 +4,7 @@ Compile, merge, optimize, and distribute static files including: TypeScript, Jav
 
 ## Highlights
 
-* Compiple and distribute singe or multiple files to a single or multiple output
+* Compiple and distribute single or multiple files to a single or multiple output
 * Create advanced configuration with simple JSON configuration file, no coding required.
 * No need to add the package into the project package dependencies, just install it globally.
 
