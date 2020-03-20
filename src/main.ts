@@ -8,7 +8,7 @@ const gulpRename = require('gulp-rename');
 const gulpConcat = require("gulp-concat");
 const gulpTs = require("gulp-typescript");
 const gulpSourcemaps = require("gulp-sourcemaps");
-const gulpUglify = require('gulp-uglify');
+const gulpMinify = require('gulp-minify');
 const merge2 = require('merge2');
 const gulpCleanCSS = require('gulp-clean-css');
 const gulpFilter = require('gulp-filter-each');
@@ -258,8 +258,11 @@ const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: str
                 
                     if (build.js.minify) {
 
-                        process.pipe(gulpUglify())
-                        .pipe(gulpRename({suffix: ".min"}))
+                        process.pipe(gulpMinify({
+                            ext:{
+                                src:'.js',
+                                min:'.min.js'
+                            }}))
                         .pipe(gulp.dest(outputDirectory));
                     }
                     break;

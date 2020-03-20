@@ -52,6 +52,12 @@
                 "files/saasFile.scss"
             ],
             "builds": ["dev", "dist"]
+        }, {
+            "output": ["devfolder/site.js"],
+            "input": [
+                "files/jsFile1.js"
+            ],
+            "builds": ["dev", "dist"]
         },
         {
             "output": ["devfolder/js/site.js"],

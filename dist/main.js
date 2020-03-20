@@ -9,7 +9,7 @@ var gulpRename = require('gulp-rename');
 var gulpConcat = require("gulp-concat");
 var gulpTs = require("gulp-typescript");
 var gulpSourcemaps = require("gulp-sourcemaps");
-var gulpUglify = require('gulp-uglify');
+var gulpMinify = require('gulp-minify');
 var merge2 = require('merge2');
 var gulpCleanCSS = require('gulp-clean-css');
 var gulpFilter = require('gulp-filter-each');
@@ -168,8 +168,12 @@ var runFiles = function (config, file, builds) {
                     break;
                 case 'js':
                     if (build.js.minify) {
-                        process.pipe(gulpUglify())
-                            .pipe(gulpRename({ suffix: ".min" }))
+                        process.pipe(gulpMinify({
+                            ext: {
+                                src: '.js',
+                                min: '.min.js'
+                            }
+                        }))
                             .pipe(gulp.dest(outputDirectory));
                     }
                     break;
