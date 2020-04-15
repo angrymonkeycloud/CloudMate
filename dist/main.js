@@ -104,7 +104,17 @@ exports.watch = function (builds) {
     config.files.forEach(function (file) {
         file.builds.forEach(function (buildName) {
             if (builds === null || builds.indexOf(buildName) !== -1) {
-                var watch_1 = chokidar.watch(file.input, { persistent: true })
+                var extensions = ['less', 'scss'];
+                var watchPaths_1 = [];
+                file.input.forEach(function (path) {
+                    watchPaths_1.push(path);
+                });
+                for (var _i = 0, extensions_1 = extensions; _i < extensions_1.length; _i++) {
+                    var extension = extensions_1[_i];
+                    if (config_1.MateConfigFile.hasExtension(file.input, extension))
+                        watchPaths_1.push('./**/*.' + extension);
+                }
+                var watch_1 = chokidar.watch(watchPaths_1, { persistent: true })
                     .on('change', function (event, path) {
                     runFiles(config, file, [buildName]);
                 });

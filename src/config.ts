@@ -1,4 +1,5 @@
 import fs = require('fs');
+import glob = require("glob");
 
 export class MateConfig{
 
@@ -114,6 +115,19 @@ export class MateConfigFile{
     input: string[];
     output: string[];
     builds?: string[];
+
+    static hasExtension(input: string[], extension: string): boolean{
+
+        const mathExpression = new RegExp('\\.' + extension + '$');
+
+        for(const path of input)
+            for (const file of glob.sync(path)) {
+                if (file.match(mathExpression))
+                    return true;
+            }
+
+        return false;
+    }
 }
 
 export class MateConfigBuild{

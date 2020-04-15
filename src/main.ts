@@ -157,18 +157,50 @@ export const watch = function(builds?: string[]) {
             
             if (builds === null || builds.indexOf(buildName) !== -1) {
 
-                const watch = chokidar.watch(file.input, { persistent: true})
+                const extensions = ['less', 'scss'];
+
+                const watchPaths: string[] = [];
+
+                file.input.forEach((path) =>{
+                    watchPaths.push(path);
+                });
+                
+                for (const extension of extensions)
+                    if (MateConfigFile.hasExtension(file.input, extension))
+                        watchPaths.push('./**/*.' + extension);
+
+                const watch = chokidar.watch(watchPaths, { persistent: true})
                                         .on('change', (event, path: string) => {
                                             runFiles(config, file, [buildName]);
                                         });
 
                 allWatchers.push(watch);
+
+                // appendWatchForImportedFiles(config, file, buildName);
             }
         });
     });
     
     runBuild(builds);
 }
+
+// const appendWatchForImportedFiles = function(config: MateConfig, file: MateConfigFile, buildName: string): void{
+
+//     const extensions = ['less', 'scss'];
+
+//     extensions.forEach((extension: string): void => {
+
+//         if (!MateConfigFile.hasExtension(file.input, extension))
+//             return;
+    
+//         const watch = chokidar.watch('**/*.' + extension, { persistent: true})
+//                             .on('change', (event, path: string) => {
+//                                 runFiles(config, file, [buildName]);
+//                             });
+
+//         allWatchers.push(watch);
+//     });
+// }
 
 export const runBuild = function(builds?: string[]) {
 

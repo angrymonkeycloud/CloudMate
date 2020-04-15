@@ -14,6 +14,7 @@ var __extends = (this && this.__extends) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 var fs = require("fs");
+var glob = require("glob");
 var MateConfig = (function () {
     function MateConfig(_name, _version, _files, _builds) {
         this.name = _name;
@@ -86,6 +87,18 @@ exports.MateConfig = MateConfig;
 var MateConfigFile = (function () {
     function MateConfigFile() {
     }
+    MateConfigFile.hasExtension = function (input, extension) {
+        var mathExpression = new RegExp('\\.' + extension + '$');
+        for (var _i = 0, input_1 = input; _i < input_1.length; _i++) {
+            var path = input_1[_i];
+            for (var _a = 0, _b = glob.sync(path); _a < _b.length; _a++) {
+                var file = _b[_a];
+                if (file.match(mathExpression))
+                    return true;
+            }
+        }
+        return false;
+    };
     return MateConfigFile;
 }());
 exports.MateConfigFile = MateConfigFile;
