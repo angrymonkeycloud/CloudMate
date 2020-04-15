@@ -15,7 +15,7 @@ var gulpCleanCSS = require('gulp-clean-css');
 var gulpFilter = require('gulp-filter-each');
 var path = require('path');
 var webClean = require('./webcleanjs');
-var bundle = function (files, build) {
+var bundle = function (files, outputExtention, build) {
     var process = [];
     var groupFilesExtention = '';
     var groupedFiles = [];
@@ -23,7 +23,7 @@ var bundle = function (files, build) {
         var fileExtention = file.split('.').pop().toLowerCase();
         if (fileExtention !== groupFilesExtention) {
             if (groupedFiles.length > 0) {
-                process.push(compile(groupedFiles, groupFilesExtention, build));
+                process.push(compile(groupedFiles, groupFilesExtention, outputExtention, build));
                 groupedFiles = [];
             }
             groupFilesExtention = fileExtention;
@@ -31,16 +31,20 @@ var bundle = function (files, build) {
         groupedFiles.push(file);
     });
     if (groupedFiles.length > 0)
-        process.push(compile(groupedFiles, groupFilesExtention, build));
+        process.push(compile(groupedFiles, groupFilesExtention, outputExtention, build));
     var stream = merge2();
     process.forEach(function (p) {
         stream.add(p);
     });
     return stream;
 };
-var compile = function (files, extention, build) {
+var compile = function (files, inputExtention, outputExtention, build) {
     var process = gulp.src(files);
-    switch (extention) {
+    console.log(inputExtention + ' | ' + outputExtention);
+    if (inputExtention === outputExtention)
+        return process.pipe(gulpConcat('empty'));
+    console.log(inputExtention + ' | ' + outputExtention);
+    switch (inputExtention) {
         case 'css':
             return process.pipe(gulpConcat('empty'));
         case 'less':
@@ -73,11 +77,11 @@ var createTypeScriptDeclaration = function (files, outputDirectory, outputFileNa
     var typescriptDeclarations = [];
     files.forEach(function (file) {
         var fileExtention = file.split('.').pop().toLowerCase();
-        if (fileExtention === 'ts')
+        if (fileExtention === 'ts' && !file.toLocaleLowerCase().endsWith('.d.ts'))
             typescriptDeclarations.push(file);
     });
     if (typescriptDeclarations.length > 0)
-        compile(typescriptDeclarations, 'd.ts', build)
+        compile(typescriptDeclarations, 'd.ts', 'ts', build)
             .pipe(gulpFilter(function (content, filepath) { return filepath.toLowerCase().endsWith('.d.ts'); }))
             .pipe(gulpConcat('empty'))
             .pipe(gulpRename({
@@ -158,7 +162,7 @@ var runFiles = function (config, file, builds) {
             }
             if (build.js.declaration === true)
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
-            var process = bundle(file.input, build)
+            var process = bundle(file.input, outputExtention, build)
                 .pipe(gulpConcat('empty'));
             switch (outputExtention) {
                 case 'js':

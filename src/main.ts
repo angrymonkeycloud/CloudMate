@@ -15,7 +15,7 @@ const gulpFilter = require('gulp-filter-each');
 const path = require('path');
 const webClean = require('./webcleanjs');
 
-const bundle = function(files: string[], build: MateConfigBuild): any {
+const bundle = function(files: string[], outputExtention: string, build: MateConfigBuild): any {
 
     const process: any[] = [];
 
@@ -30,7 +30,7 @@ const bundle = function(files: string[], build: MateConfigBuild): any {
 
             if (groupedFiles.length > 0)
             {
-                process.push(compile(groupedFiles, groupFilesExtention, build));
+                process.push(compile(groupedFiles, groupFilesExtention, outputExtention, build));
                 groupedFiles = []
             }
 
@@ -42,7 +42,7 @@ const bundle = function(files: string[], build: MateConfigBuild): any {
     });
 
     if (groupedFiles.length > 0)
-        process.push(compile(groupedFiles, groupFilesExtention, build));
+        process.push(compile(groupedFiles, groupFilesExtention, outputExtention, build));
 
    const stream = merge2();
 
@@ -53,11 +53,18 @@ const bundle = function(files: string[], build: MateConfigBuild): any {
    return stream;
 }
 
-const compile = function(files: string[], extention: string, build: MateConfigBuild): any {
+const compile = function(files: string[], inputExtention: string, outputExtention: string, build: MateConfigBuild): any {
 
     let process = gulp.src(files);
 
-    switch (extention){
+    console.log(inputExtention + ' | ' + outputExtention);
+    
+    if (inputExtention === outputExtention)
+        return process.pipe(gulpConcat('empty'));
+
+    console.log(inputExtention + ' | ' + outputExtention);
+
+    switch (inputExtention){
         case 'css':
             return process.pipe(gulpConcat('empty'));
             
@@ -112,12 +119,12 @@ const createTypeScriptDeclaration = function(files: string [], outputDirectory: 
     files.forEach((file) => {
         const fileExtention = file.split('.').pop().toLowerCase();
 
-        if (fileExtention === 'ts')
+        if (fileExtention === 'ts' && !file.toLocaleLowerCase().endsWith('.d.ts'))
             typescriptDeclarations.push(file);
     });
 
     if (typescriptDeclarations.length > 0)
-        compile(typescriptDeclarations, 'd.ts', build)
+        compile(typescriptDeclarations, 'd.ts', 'ts', build)
             .pipe(gulpFilter((content, filepath: string) => filepath.toLowerCase().endsWith('.d.ts')))
             .pipe(gulpConcat('empty'))
             .pipe(gulpRename({
@@ -259,7 +266,7 @@ const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: str
             if (build.js.declaration === true)
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
 
-                let process = bundle(file.input, build)
+                let process = bundle(file.input, outputExtention, build)
                 .pipe(gulpConcat('empty'))
             
                 switch (outputExtention) {

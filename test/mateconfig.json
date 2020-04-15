@@ -68,6 +68,13 @@
             "builds": ["dev", "dist"]
         },
         {
+            "output": ["devfolder/variables.less"],
+            "input": [
+                "files/variables.less"
+            ],
+            "builds": ["dev", "dist"]
+        },
+        {
             "output": ["README.md"],
             "input": ["README.md"],
             "builds": ["dist"]
