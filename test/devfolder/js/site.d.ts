@@ -6,3 +6,4 @@ declare const defaultVariable: Test1;
 export default defaultVariable;
 
 export {};
+

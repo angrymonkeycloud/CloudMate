@@ -56,13 +56,9 @@ const bundle = function(files: string[], outputExtention: string, build: MateCon
 const compile = function(files: string[], inputExtention: string, outputExtention: string, build: MateConfigBuild): any {
 
     let process = gulp.src(files);
-
-    console.log(inputExtention + ' | ' + outputExtention);
     
     if (inputExtention === outputExtention)
         return process.pipe(gulpConcat('empty'));
-
-    console.log(inputExtention + ' | ' + outputExtention);
 
     switch (inputExtention){
         case 'css':
@@ -99,6 +95,9 @@ const compile = function(files: string[], inputExtention: string, outputExtentio
 
             process = process.pipe(gulpTs(build.ts.compilerOptions));
 
+            if (outputExtention === 'js' && build.js.webClean)
+                process = process.pipe(webClean());
+
             if (build.js.sourceMap)
                 process = process.pipe(gulpSourcemaps.write());
 
@@ -127,6 +126,7 @@ const createTypeScriptDeclaration = function(files: string [], outputDirectory: 
         compile(typescriptDeclarations, 'd.ts', 'ts', build)
             .pipe(gulpFilter((content, filepath: string) => filepath.toLowerCase().endsWith('.d.ts')))
             .pipe(gulpConcat('empty'))
+            .pipe(webClean({isDeclaration: true}))
             .pipe(gulpRename({
                 basename: outputFileName.replace('.js', ''),
                 suffix: '.d',
@@ -268,15 +268,6 @@ const runFiles = function(config: MateConfig, file: MateConfigFile, builds?: str
 
                 let process = bundle(file.input, outputExtention, build)
                 .pipe(gulpConcat('empty'))
-            
-                switch (outputExtention) {
-    
-                    case 'js': 
-                    
-                        if (build.js.webClean)
-                            process = process.pipe(webClean());
-                        break;
-                }
 
                 process = process.pipe(gulpRename(outputFileName))
                 .pipe(gulp.dest(outputDirectory));

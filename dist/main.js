@@ -40,10 +40,8 @@ var bundle = function (files, outputExtention, build) {
 };
 var compile = function (files, inputExtention, outputExtention, build) {
     var process = gulp.src(files);
-    console.log(inputExtention + ' | ' + outputExtention);
     if (inputExtention === outputExtention)
         return process.pipe(gulpConcat('empty'));
-    console.log(inputExtention + ' | ' + outputExtention);
     switch (inputExtention) {
         case 'css':
             return process.pipe(gulpConcat('empty'));
@@ -65,6 +63,8 @@ var compile = function (files, inputExtention, outputExtention, build) {
             if (build.js.sourceMap)
                 process = process.pipe(gulpSourcemaps.init());
             process = process.pipe(gulpTs(build.ts.compilerOptions));
+            if (outputExtention === 'js' && build.js.webClean)
+                process = process.pipe(webClean());
             if (build.js.sourceMap)
                 process = process.pipe(gulpSourcemaps.write());
             return process.pipe(gulpConcat('empty'));
@@ -84,6 +84,7 @@ var createTypeScriptDeclaration = function (files, outputDirectory, outputFileNa
         compile(typescriptDeclarations, 'd.ts', 'ts', build)
             .pipe(gulpFilter(function (content, filepath) { return filepath.toLowerCase().endsWith('.d.ts'); }))
             .pipe(gulpConcat('empty'))
+            .pipe(webClean({ isDeclaration: true }))
             .pipe(gulpRename({
             basename: outputFileName.replace('.js', ''),
             suffix: '.d',
@@ -164,12 +165,6 @@ var runFiles = function (config, file, builds) {
                 createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
             var process = bundle(file.input, outputExtention, build)
                 .pipe(gulpConcat('empty'));
-            switch (outputExtention) {
-                case 'js':
-                    if (build.js.webClean)
-                        process = process.pipe(webClean());
-                    break;
-            }
             process = process.pipe(gulpRename(outputFileName))
                 .pipe(gulp.dest(outputDirectory));
             switch (outputExtention) {

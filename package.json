@@ -1,6 +1,6 @@
 {
     "name": "cloudmate",
-    "version": "0.8.8",
+    "version": "0.8.10",
     "description": "Process, using gulp, to compile, optimize, and distribute static files (styles, scripts, and images).",
     "main": "dist/cli.js",
     "bin": {
