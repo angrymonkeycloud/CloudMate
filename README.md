@@ -5,7 +5,7 @@ Compile, merge, optimize, and distribute static files including: TypeScript, Jav
 ## Highlights
 
 * Compile and distribute single or multiple files to a single or multiple output
-* Create advanced configuration with simple JSON configuration file, no coding required.
+* Create advanced configuration with simple JSON, YAML, or JavaScript configuration file, no coding required.
 * No need to add the package into the project package dependencies, just install it globally.
 
 ## Getting started
@@ -18,9 +18,27 @@ npm i -g cloudmate
 
 ## Simple scenario
 
-### Create JSON configuration file in your project
+### Create one of the following configuration file in your project:
 
-`mateconfig.json`
+```js
+// JSON or YAML
+.mateconfig
+
+// JSON
+.mateconfig.json
+
+// YAML
+.mateconfig.yaml,
+.mateconfig.yml,
+
+// JavaScipt
+.mateconfig.js,
+
+// JSON under "mateconfig" property
+package.json
+```
+
+Configuration file sample content:
 
 ```json
 {
@@ -128,14 +146,14 @@ overwrites the output directory.
 creates a sub directory under the outDir which will be named under the project version
 
 * outDir should be specified to take effect.
-* project version will try to find "version" under the mateconfig.json.
+* project version will try to find "version" under the configuration file.
 * if not found will try to find it under the "package.json".
 
 **outDirName**
 creates a sub directory under the outDir (and under the version folder if specified) which will be named under the project name
 
 * outDir should be specified to take effect.
-* project name will try to find "name" under the mateconfig.json.
+* project name will try to find "name" under the configuration file.
 * if not found will try to find it under the "package.json".
 
 **outDirSuffix**

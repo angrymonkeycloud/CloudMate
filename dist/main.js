@@ -94,9 +94,12 @@ var createTypeScriptDeclaration = function (files, outputDirectory, outputFileNa
 };
 var allWatchers = [];
 exports.watch = function (builds) {
+    var config = config_1.MateConfig.get();
+    if (!config)
+        return;
     if (builds === undefined || (builds !== null && builds.length === 0))
         builds = ['dev'];
-    var configWatcher = chokidar.watch('mateconfig.json', { persistent: true })
+    var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true })
         .on('change', function (event, path) {
         allWatchers.forEach(function (watcher) {
             watcher.close();
@@ -105,7 +108,6 @@ exports.watch = function (builds) {
         exports.watch(builds);
     });
     allWatchers.push(configWatcher);
-    var config = config_1.MateConfig.get();
     config.files.forEach(function (file) {
         file.builds.forEach(function (buildName) {
             if (builds === null || builds.indexOf(buildName) !== -1) {
@@ -130,8 +132,10 @@ exports.watch = function (builds) {
     exports.runBuild(builds);
 };
 exports.runBuild = function (builds) {
-    console.log('executed at ' + new Date().toTimeString());
     var config = config_1.MateConfig.get();
+    if (!config)
+        return;
+    console.log('executed at ' + new Date().toTimeString());
     config.files.forEach(function (file) {
         runFiles(config, file, builds);
     });

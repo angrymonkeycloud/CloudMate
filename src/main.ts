@@ -139,10 +139,15 @@ let allWatchers: chokidar.FSWatcher[] = [];
 
 export const watch = function(builds?: string[]) {
 
+    const config = MateConfig.get();
+
+    if (!config)
+        return;
+
     if (builds === undefined || (builds !== null && builds.length === 0))
         builds = ['dev'];
 
-    const configWatcher = chokidar.watch('mateconfig.json', { persistent: true})
+    const configWatcher = chokidar.watch(MateConfig.availableConfigurationFile, { persistent: true})
                                     .on('change', (event, path: string) => {
 
                                         allWatchers.forEach((watcher: chokidar.FSWatcher) =>
@@ -156,8 +161,6 @@ export const watch = function(builds?: string[]) {
                                     });
 
     allWatchers.push(configWatcher);
-
-    const config = MateConfig.get();
 
     config.files.forEach((file) => {
         file.builds.forEach((buildName) => {
@@ -210,10 +213,13 @@ export const watch = function(builds?: string[]) {
 // }
 
 export const runBuild = function(builds?: string[]) {
-
-    console.log('executed at ' + new Date().toTimeString());
     
     const config = MateConfig.get();
+
+    if (!config)
+        return;
+
+    console.log('executed at ' + new Date().toTimeString());
 
     config.files.forEach((file): void => {
         

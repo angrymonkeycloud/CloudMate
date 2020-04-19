@@ -1,14 +1,67 @@
 import fs = require('fs');
 import glob = require("glob");
+import { cosmiconfigSync } from 'cosmiconfig';
+import { CosmiconfigResult } from 'cosmiconfig/dist/types';
 
-export class MateConfig{
+export class MateConfig {
 
-    static get = function(): MateConfig {
-
-        const data = fs.readFileSync('mateconfig.json');
-
-        const configJson: MateConfig = JSON.parse(data.toString());
+    private static _configurationExplorer;
+    private static get configurationExplorer() {
         
+        if (this._configurationExplorer !== undefined)
+            return this._configurationExplorer;
+
+        this._configurationExplorer = cosmiconfigSync('mateconfig', {
+            searchPlaces: [
+                '.mateconfig',
+                '.mateconfig.json',
+                '.mateconfig.yaml',
+                '.mateconfig.yml',
+                '.mateconfig.js',
+                'mateconfig.json', // Deprecated
+                'package.json',
+            ], transform: (result) => {
+
+                if (!result || !result.config)
+                    return result;
+        
+                if (typeof result.config !== "object")
+                    throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
+        
+                delete result.config.$schema;
+                  
+                return result;
+            }
+        });
+
+        return this._configurationExplorer;
+    }
+
+    static get availableConfigurationFile(): string {
+
+        const explorer = this.configurationExplorer;
+        
+        try {
+            const result = explorer.search();
+            return result.filepath;
+        } catch { throw new Error('Configuration file was not found.'); }
+    }
+
+    static get(): MateConfig {
+
+        const configurationFile = MateConfig.availableConfigurationFile;
+
+        if (!configurationFile)
+            return null;
+
+        let configJson: MateConfig;
+        
+        const result: CosmiconfigResult = this.configurationExplorer.load(configurationFile);
+        configJson = result.config;
+
+        if (!configJson)
+            throw new Error('Error parsing configuration file.');
+
         let config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
 
         config.setUndefined();

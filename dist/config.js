@@ -15,6 +15,7 @@ var __extends = (this && this.__extends) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 var fs = require("fs");
 var glob = require("glob");
+var cosmiconfig_1 = require("cosmiconfig");
 var MateConfig = (function () {
     function MateConfig(_name, _version, _files, _builds) {
         this.name = _name;
@@ -24,6 +25,61 @@ var MateConfig = (function () {
         if (this.builds === undefined)
             this.builds = [];
     }
+    Object.defineProperty(MateConfig, "configurationExplorer", {
+        get: function () {
+            if (this._configurationExplorer !== undefined)
+                return this._configurationExplorer;
+            this._configurationExplorer = cosmiconfig_1.cosmiconfigSync('mateconfig', {
+                searchPlaces: [
+                    '.mateconfig',
+                    '.mateconfig.json',
+                    '.mateconfig.yaml',
+                    '.mateconfig.yml',
+                    '.mateconfig.js',
+                    'mateconfig.json',
+                    'package.json',
+                ], transform: function (result) {
+                    if (!result || !result.config)
+                        return result;
+                    if (typeof result.config !== "object")
+                        throw new Error("Config is only allowed to be an object, but received " + typeof result.config + " in \"" + result.filepath + "\"");
+                    delete result.config.$schema;
+                    return result;
+                }
+            });
+            return this._configurationExplorer;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MateConfig, "availableConfigurationFile", {
+        get: function () {
+            var explorer = this.configurationExplorer;
+            try {
+                var result = explorer.search();
+                return result.filepath;
+            }
+            catch (_a) {
+                throw new Error('Configuration file was not found.');
+            }
+        },
+        enumerable: true,
+        configurable: true
+    });
+    MateConfig.get = function () {
+        var configurationFile = MateConfig.availableConfigurationFile;
+        if (!configurationFile)
+            return null;
+        var configJson;
+        var result = this.configurationExplorer.load(configurationFile);
+        configJson = result.config;
+        if (!configJson)
+            throw new Error('Error parsing configuration file.');
+        var config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
+        config.setUndefined();
+        return config;
+    };
+    ;
     MateConfig.prototype.setPackage = function () {
         this.package = JSON.parse(fs.readFileSync('package.json').toString());
     };
@@ -73,13 +129,6 @@ var MateConfig = (function () {
                 file.builds.push('dev');
             }
         });
-    };
-    MateConfig.get = function () {
-        var data = fs.readFileSync('mateconfig.json');
-        var configJson = JSON.parse(data.toString());
-        var config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
-        config.setUndefined();
-        return config;
     };
     return MateConfig;
 }());
