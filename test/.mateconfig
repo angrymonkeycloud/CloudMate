@@ -14,10 +14,6 @@
             "js": {
                 "minify": false,
                 "sourceMap": true
-            },
-            "ts": {
-                "declaration": true,
-                "compilerOptions": {}
             }
         },
         {
@@ -36,16 +32,6 @@
                 "sourceMap": false,
                 "declaration": true,
                 "webClean": true
-            },
-            "ts": {
-                "compilerOptions": {
-                    "noImplicitAny": false,
-                    "noEmitOnError": false,
-                    "removeComments": true,
-                    "target": "es5",
-                    "lib": ["ES2015", "DOM"],
-                    "module": "ES6"
-                }
             }
         }
     ],

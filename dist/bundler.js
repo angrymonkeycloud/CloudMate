@@ -7,9 +7,9 @@ var gulp = require('gulp');
 var gulpLess = require('gulp-less');
 var gulpSass = require('gulp-sass');
 var gulpRename = require('gulp-rename');
-var gulpConcat = require("gulp-concat");
-var gulpTs = require("gulp-typescript");
-var gulpSourcemaps = require("gulp-sourcemaps");
+var gulpConcat = require('gulp-concat');
+var gulpTs = require('gulp-typescript');
+var gulpSourcemaps = require('gulp-sourcemaps');
 var gulpMinify = require('gulp-minify');
 var merge2 = require('merge2');
 var gulpCleanCSS = require('gulp-clean-css');
@@ -28,8 +28,7 @@ var MateBundler = (function () {
         var _this = this;
         if (builds === undefined || (builds !== null && builds.length === 0))
             builds = ['dev'];
-        var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true })
-            .on('change', function (event, path) {
+        var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true }).on('change', function (event, path) {
             _this.allWatchers.forEach(function (watcher) {
                 watcher.close();
             });
@@ -50,8 +49,7 @@ var MateBundler = (function () {
                         if (config_1.MateConfigFile.hasExtension(file.input, extension))
                             watchPaths_1.push('./**/*.' + extension);
                     }
-                    var watch = chokidar.watch(watchPaths_1, { persistent: true })
-                        .on('change', function (event, path) {
+                    var watch = chokidar.watch(watchPaths_1, { persistent: true }).on('change', function (event, path) {
                         _this.runFiles(config, file, [buildName]);
                     });
                     _this.allWatchers.push(watch);
@@ -87,25 +85,25 @@ var MateBundler = (function () {
                 }
                 if (build.js.declaration === true)
                     MateBundler.createTypeScriptDeclaration(file.input, outputDirectory, outputFileName, build);
-                var process = MateBundler.bundle(file.input, outputExtention, build)
-                    .pipe(gulpConcat('empty'));
-                process = process.pipe(gulpRename(outputFileName))
-                    .pipe(gulp.dest(outputDirectory));
+                var process = MateBundler.bundle(file.input, outputExtention, build).pipe(gulpConcat('empty'));
+                process = process.pipe(gulpRename(outputFileName)).pipe(gulp.dest(outputDirectory));
                 switch (outputExtention) {
                     case 'css':
                         if (build.css.minify) {
-                            process.pipe(gulpCleanCSS())
-                                .pipe(gulpRename({ suffix: ".min" }))
+                            process
+                                .pipe(gulpCleanCSS())
+                                .pipe(gulpRename({ suffix: '.min' }))
                                 .pipe(gulp.dest(outputDirectory));
                         }
                         break;
                     case 'js':
                         if (build.js.minify) {
-                            process.pipe(gulpMinify({
+                            process
+                                .pipe(gulpMinify({
                                 ext: {
                                     src: '.js',
-                                    min: '.min.js'
-                                }
+                                    min: '.min.js',
+                                },
                             }))
                                 .pipe(gulp.dest(outputDirectory));
                         }
@@ -129,7 +127,7 @@ var MateBundler = (function () {
                 .pipe(gulpRename({
                 basename: outputFileName.replace('.js', ''),
                 suffix: '.d',
-                extname: '.ts'
+                extname: '.ts',
             }))
                 .pipe(gulp.dest(outputDirectory));
     };
@@ -180,14 +178,20 @@ var MateBundler = (function () {
             case 'ts':
                 if (build.js.sourceMap)
                     process = process.pipe(gulpSourcemaps.init());
-                process = process.pipe(gulpTs(build.ts.compilerOptions));
+                var ts = null;
+                if (build.ts)
+                    ts = gulpTs.createProject(build.ts);
+                process = process.pipe(ts ? ts() : gulpTs());
                 if (outputExtention === 'js' && build.js.webClean)
                     process = process.pipe(webClean());
                 if (build.js.sourceMap)
                     process = process.pipe(gulpSourcemaps.write());
                 return process.pipe(gulpConcat('empty'));
             case 'd.ts':
-                return process.pipe(gulpTs(config_1.MateConfigTSConfig.declarationCompilerOptions(build.ts.compilerOptions)));
+                var tsd = null;
+                if (build.ts)
+                    tsd = gulpTs.createProject(build.ts, { declaration: true });
+                return process.pipe(tsd ? tsd() : gulpTs({ declaration: true }));
         }
         return process;
     };

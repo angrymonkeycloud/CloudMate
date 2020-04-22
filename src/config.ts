@@ -2,6 +2,7 @@ import fs = require('fs');
 import glob = require('glob');
 import { cosmiconfigSync } from 'cosmiconfig';
 import { CosmiconfigResult } from 'cosmiconfig/dist/types';
+import * as ts from "typescript";
 
 export class MateConfig {
 	private static _configurationExplorer;
@@ -57,6 +58,14 @@ export class MateConfig {
 
 		let config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
 		config.format = configJson.format;
+
+		const tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
+
+		if (tsConfigPath)
+			config.builds.forEach((build) => {
+				if (!build.ts)
+					build.ts = tsConfigPath;
+			});
 
 		config.setUndefined();
 		return config;
@@ -163,7 +172,7 @@ export class MateConfigBuild {
 	outDirName?: boolean;
 	css?: MateConfigCSSConfig;
 	js?: MateConfigJSConfig;
-	ts?: MateConfigTSConfig;
+	ts?: string;
 
 	constructor(_name: string) {
 		this.name = _name;
@@ -185,12 +194,6 @@ export class MateConfigBuild {
 		if (build.js === undefined) build.js = new MateConfigJSConfig();
 
 		MateConfigJSConfig.setUndefined(build.js);
-
-		// TS
-
-		if (build.ts === undefined) build.ts = new MateConfigTSConfig();
-
-		MateConfigTSConfig.setUndefined(build.ts);
 	}
 }
 
@@ -226,32 +229,6 @@ export class MateConfigJSConfig extends MateConfigBaseConfig {
 	}
 }
 
-export class MateConfigTSConfig extends MateConfigBaseConfig {
-	compilerOptions?: tsCompilerOptions;
-
-	static declarationCompilerOptions(compilerOptions?: tsCompilerOptions): tsCompilerOptions {
-		var value: tsCompilerOptions = {};
-
-		for (const key in compilerOptions) value[key] = compilerOptions[key];
-
-		value.declaration = true;
-
-		return value;
-	}
-
-	static setUndefined(ts: MateConfigTSConfig): void {
-		if (ts.compilerOptions === undefined) ts.compilerOptions = {};
-	}
-}
-
 export class MateConfigFormatterConfig {
 	path: string | string[];
-}
-
-interface tsCompilerOptions {
-	// to be ignored
-	declaration?: boolean;
-	sourceMap?: boolean;
-	outDir?: string;
-	outFile?: string;
 }

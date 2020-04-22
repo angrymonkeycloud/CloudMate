@@ -1,5 +1,5 @@
 const path = require('path');
-import { MateConfig, MateConfigFile, MateConfigBuild, MateConfigTSConfig } from './config';
+import { MateConfig, MateConfigFile, MateConfigBuild } from './config';
 import chokidar = require('chokidar');
 const gulp = require('gulp');
 const gulpLess = require('gulp-less');
@@ -214,18 +214,32 @@ export class MateBundler {
 				return process.pipe(gulpConcat('empty'));
 
 			case 'ts':
-				if (build.js.sourceMap) process = process.pipe(gulpSourcemaps.init());
+				if (build.js.sourceMap)
+					process = process.pipe(gulpSourcemaps.init());
 
-				process = process.pipe(gulpTs(build.ts.compilerOptions));
+				let ts = null;
 
-				if (outputExtention === 'js' && build.js.webClean) process = process.pipe(webClean());
+				if (build.ts)
+					ts = gulpTs.createProject(build.ts);
 
-				if (build.js.sourceMap) process = process.pipe(gulpSourcemaps.write());
+				process = process.pipe(ts ? ts() : gulpTs());
+
+				if (outputExtention === 'js' && build.js.webClean)
+					process = process.pipe(webClean());
+
+				if (build.js.sourceMap)
+					process = process.pipe(gulpSourcemaps.write());
 
 				return process.pipe(gulpConcat('empty'));
 
 			case 'd.ts':
-				return process.pipe(gulpTs(MateConfigTSConfig.declarationCompilerOptions(build.ts.compilerOptions)));
+
+				let tsd = null;
+
+				if (build.ts)
+					tsd = gulpTs.createProject(build.ts, { declaration: true });
+
+				return process.pipe(tsd ? tsd() : gulpTs({ declaration: true }));
 		}
 
 		return process;

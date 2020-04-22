@@ -1,6 +1,6 @@
-import defaultVariable, {testVariable} from "./tsFile1";
+import defaultVariable, { testVariable } from './tsFile1';
 
-console.log("ts file 2");
+console.log('ts file 2');
 
 class Test2 {
 	SecondProperty: string;

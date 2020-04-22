@@ -1,6 +1,6 @@
 {
 	"format": {
-		"path": ["src/*", "./mateconfig.json"]
+		"path": ["./mateconfig.json"]
 	},
 	"builds": [
 		{
@@ -9,14 +9,6 @@
 				"minify": false,
 				"sourceMap": true,
 				"declaration": false
-			},
-			"ts": {
-				"compilerOptions": {
-					"noImplicitAny": false,
-					"noEmitOnError": false,
-					"removeComments": true,
-					"target": "es5"
-				}
 			}
 		},
 		{
@@ -26,14 +18,6 @@
 				"minify": false,
 				"sourceMap": false,
 				"declaration": false
-			},
-			"ts": {
-				"compilerOptions": {
-					"noImplicitAny": false,
-					"noEmitOnError": false,
-					"removeComments": true,
-					"target": "es5"
-				}
 			}
 		}
 	],

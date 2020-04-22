@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var prettier = require("prettier");
+var prettier = require('prettier');
 var fs = require("fs");
 var glob = require("glob");
 var config_1 = require("./config");
@@ -80,8 +80,7 @@ var MateFormatter = (function () {
     };
     MateFormatter.watch = function (config) {
         var _this = this;
-        var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true })
-            .on('change', function (event, path) {
+        var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true }).on('change', function (event, path) {
             _this.allWatchers.forEach(function (watcher) {
                 watcher.close();
             });

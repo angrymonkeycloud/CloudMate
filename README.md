@@ -87,14 +87,6 @@ Default build's name is **dev**, so if the developer didn't specify the build of
                 "sourceMap": true,
                 "declaration": true,
                 "webClean": true
-            },
-            "ts": {
-                "compilerOptions": {
-                    "target": "es5",
-                    "noEmitOnError": false,
-                    "noImplicitAny": false,
-                    "module": "ES6"
-                }
             }
         },
         {
@@ -133,7 +125,7 @@ removes unwanted JavaScript codes such as require(…). Make sure you’ve bundl
 > **Important:** Web Clean is in early staging development, and it requires module ES6 and highigher under ts compilerOptions.
 
 **ts compilerOptions**
-accepts tsconfig compiler options <https://www.typescriptlang.org/docs/handbook/compiler-options.html>
+Reads tsconfig.json file if found.
 
 * ignore
     * declaratio and sourceMap (will be defined under js options).

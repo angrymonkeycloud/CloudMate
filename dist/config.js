@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var fs = require("fs");
 var glob = require("glob");
 var cosmiconfig_1 = require("cosmiconfig");
+var ts = require("typescript");
 var MateConfig = (function () {
     function MateConfig(_name, _version, _files, _builds) {
         this.name = _name;
@@ -38,14 +39,15 @@ var MateConfig = (function () {
                     '.mateconfig.js',
                     'mateconfig.json',
                     'package.json',
-                ], transform: function (result) {
+                ],
+                transform: function (result) {
                     if (!result || !result.config)
                         return result;
-                    if (typeof result.config !== "object")
+                    if (typeof result.config !== 'object')
                         throw new Error("Config is only allowed to be an object, but received " + typeof result.config + " in \"" + result.filepath + "\"");
                     delete result.config.$schema;
                     return result;
-                }
+                },
             });
             return this._configurationExplorer;
         },
@@ -77,10 +79,15 @@ var MateConfig = (function () {
             throw new Error('Error parsing configuration file.');
         var config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
         config.format = configJson.format;
+        var tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
+        if (tsConfigPath)
+            config.builds.forEach(function (build) {
+                if (!build.ts)
+                    build.ts = tsConfigPath;
+            });
         config.setUndefined();
         return config;
     };
-    ;
     MateConfig.prototype.setPackage = function () {
         this.package = JSON.parse(fs.readFileSync('package.json').toString());
     };
@@ -167,9 +174,6 @@ var MateConfigBuild = (function () {
         if (build.js === undefined)
             build.js = new MateConfigJSConfig();
         MateConfigJSConfig.setUndefined(build.js);
-        if (build.ts === undefined)
-            build.ts = new MateConfigTSConfig();
-        MateConfigTSConfig.setUndefined(build.ts);
     };
     return MateConfigBuild;
 }());
@@ -212,25 +216,6 @@ var MateConfigJSConfig = (function (_super) {
     return MateConfigJSConfig;
 }(MateConfigBaseConfig));
 exports.MateConfigJSConfig = MateConfigJSConfig;
-var MateConfigTSConfig = (function (_super) {
-    __extends(MateConfigTSConfig, _super);
-    function MateConfigTSConfig() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    MateConfigTSConfig.declarationCompilerOptions = function (compilerOptions) {
-        var value = {};
-        for (var key in compilerOptions)
-            value[key] = compilerOptions[key];
-        value.declaration = true;
-        return value;
-    };
-    MateConfigTSConfig.setUndefined = function (ts) {
-        if (ts.compilerOptions === undefined)
-            ts.compilerOptions = {};
-    };
-    return MateConfigTSConfig;
-}(MateConfigBaseConfig));
-exports.MateConfigTSConfig = MateConfigTSConfig;
 var MateConfigFormatterConfig = (function () {
     function MateConfigFormatterConfig() {
     }

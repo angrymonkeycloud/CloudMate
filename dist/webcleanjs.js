@@ -40,9 +40,7 @@ var CloudMateWebCleanJS = (function () {
     function CloudMateWebCleanJS() {
     }
     CloudMateWebCleanJS.cleanLines = function (content) {
-        var startWithValues = [
-            'import '
-        ];
+        var startWithValues = ['import '];
         var result = '';
         for (var _i = 0, _a = content.split('\n'); _i < _a.length; _i++) {
             var line = _a[_i];
@@ -58,10 +56,7 @@ var CloudMateWebCleanJS = (function () {
         return result;
     };
     CloudMateWebCleanJS.cleanPrefixes = function (content) {
-        var prefixesValues = [
-            'export default ',
-            'export '
-        ];
+        var prefixesValues = ['export default ', 'export '];
         for (var _i = 0, prefixesValues_1 = prefixesValues; _i < prefixesValues_1.length; _i++) {
             var prefix = prefixesValues_1[_i];
             content = content.replace(new RegExp('^(' + prefix + ')|[[:blank:]]+(' + prefix + ')', 'gmi'), '');
