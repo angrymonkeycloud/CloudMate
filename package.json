@@ -1,6 +1,6 @@
 {
     "name": "cloudmate",
-    "version": "0.8.10",
+    "version": "0.9.1",
     "description": "Process, using gulp, to compile, optimize, and distribute static files (styles, scripts, and images).",
     "main": "dist/cli.js",
     "bin": {
@@ -15,11 +15,12 @@
         "@types/gulp-less": "0.0.31",
         "@types/minimist": "^1.2.0",
         "@types/through2": "^2.0.34",
-        "del": "5.1.0",
-        "@types/vinyl": "2.0.3"
+        "@types/vinyl": "2.0.3",
+        "del": "5.1.0"
     },
     "dependencies": {
         "chokidar": "3.3.1",
+        "cosmiconfig": "6.0.0",
         "fs": "0.0.1-security",
         "glob": "^7.1.6",
         "gulp": "^4.0.2",
@@ -34,9 +35,9 @@
         "gulp-typescript": "^6.0.0-alpha.1",
         "merge2": "1.3.0",
         "minimist": "^1.2.5",
+        "prettier": "^2.0.4",
         "through2": "3.0.1",
         "typescript": "3.8.3",
-        "vinyl": "2.2.0",
-        "cosmiconfig": "6.0.0"
+        "vinyl": "2.2.0"
     }
 }

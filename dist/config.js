@@ -76,6 +76,7 @@ var MateConfig = (function () {
         if (!configJson)
             throw new Error('Error parsing configuration file.');
         var config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
+        config.format = configJson.format;
         config.setUndefined();
         return config;
     };
@@ -230,3 +231,9 @@ var MateConfigTSConfig = (function (_super) {
     return MateConfigTSConfig;
 }(MateConfigBaseConfig));
 exports.MateConfigTSConfig = MateConfigTSConfig;
+var MateConfigFormatterConfig = (function () {
+    function MateConfigFormatterConfig() {
+    }
+    return MateConfigFormatterConfig;
+}());
+exports.MateConfigFormatterConfig = MateConfigFormatterConfig;

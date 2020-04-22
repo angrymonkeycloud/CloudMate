@@ -38,7 +38,7 @@ npm i -g cloudmate
 package.json
 ```
 
-Configuration file sample content:
+JSON Configuration file sample content:
 
 ```json
 {

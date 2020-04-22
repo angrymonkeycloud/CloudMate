@@ -1,302 +1,257 @@
 import fs = require('fs');
-import glob = require("glob");
+import glob = require('glob');
 import { cosmiconfigSync } from 'cosmiconfig';
 import { CosmiconfigResult } from 'cosmiconfig/dist/types';
 
 export class MateConfig {
+	private static _configurationExplorer;
+	private static get configurationExplorer() {
+		if (this._configurationExplorer !== undefined) return this._configurationExplorer;
 
-    private static _configurationExplorer;
-    private static get configurationExplorer() {
-        
-        if (this._configurationExplorer !== undefined)
-            return this._configurationExplorer;
+		this._configurationExplorer = cosmiconfigSync('mateconfig', {
+			searchPlaces: [
+				'.mateconfig',
+				'.mateconfig.json',
+				'.mateconfig.yaml',
+				'.mateconfig.yml',
+				'.mateconfig.js',
+				'mateconfig.json', // Deprecated
+				'package.json',
+			],
+			transform: (result) => {
+				if (!result || !result.config) return result;
 
-        this._configurationExplorer = cosmiconfigSync('mateconfig', {
-            searchPlaces: [
-                '.mateconfig',
-                '.mateconfig.json',
-                '.mateconfig.yaml',
-                '.mateconfig.yml',
-                '.mateconfig.js',
-                'mateconfig.json', // Deprecated
-                'package.json',
-            ], transform: (result) => {
+				if (typeof result.config !== 'object') throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
 
-                if (!result || !result.config)
-                    return result;
-        
-                if (typeof result.config !== "object")
-                    throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
-        
-                delete result.config.$schema;
-                  
-                return result;
-            }
-        });
+				delete result.config.$schema;
 
-        return this._configurationExplorer;
-    }
+				return result;
+			},
+		});
 
-    static get availableConfigurationFile(): string {
+		return this._configurationExplorer;
+	}
 
-        const explorer = this.configurationExplorer;
-        
-        try {
-            const result = explorer.search();
-            return result.filepath;
-        } catch { throw new Error('Configuration file was not found.'); }
-    }
+	static get availableConfigurationFile(): string {
+		const explorer = this.configurationExplorer;
 
-    static get(): MateConfig {
+		try {
+			const result = explorer.search();
+			return result.filepath;
+		} catch {
+			throw new Error('Configuration file was not found.');
+		}
+	}
 
-        const configurationFile = MateConfig.availableConfigurationFile;
+	static get(): MateConfig {
+		const configurationFile = MateConfig.availableConfigurationFile;
 
-        if (!configurationFile)
-            return null;
+		if (!configurationFile) return null;
 
-        let configJson: MateConfig;
-        
-        const result: CosmiconfigResult = this.configurationExplorer.load(configurationFile);
-        configJson = result.config;
+		let configJson: MateConfig;
 
-        if (!configJson)
-            throw new Error('Error parsing configuration file.');
+		const result: CosmiconfigResult = this.configurationExplorer.load(configurationFile);
+		configJson = result.config;
 
-        let config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
+		if (!configJson) throw new Error('Error parsing configuration file.');
 
-        config.setUndefined();
-        return config;
-    };
+		let config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
+		config.format = configJson.format;
 
-    private constructor(_name:string, _version: string, _files: MateConfigFile[], _builds: MateConfigBuild[]){
+		config.setUndefined();
+		return config;
+	}
 
-        this.name = _name;
-        this.version = _version;
-        this.files = _files;
-        this.builds = _builds;
+	private constructor(_name: string, _version: string, _files: MateConfigFile[], _builds: MateConfigBuild[]) {
+		this.name = _name;
+		this.version = _version;
+		this.files = _files;
+		this.builds = _builds;
 
-        if (this.builds === undefined)
-            this.builds = [];
-    }
-    
-    name?: string;
-    version?: string;
-    files: MateConfigFile[];
-    builds: MateConfigBuild[];
+		if (this.builds === undefined) this.builds = [];
+	}
 
-    private package: object;
-    private setPackage(){
-        this.package = JSON.parse(fs.readFileSync('package.json').toString());
-    }
+	name?: string;
+	version?: string;
+	files: MateConfigFile[];
+	builds: MateConfigBuild[];
+	format?: MateConfigFormatterConfig;
 
-    private getPackageInfo(info: string){
+	private package: object;
+	private setPackage() {
+		this.package = JSON.parse(fs.readFileSync('package.json').toString());
+	}
 
-        if (!this.package)
-            this.setPackage();
+	private getPackageInfo(info: string) {
+		if (!this.package) this.setPackage();
 
-        return this.package[info];
-    }
+		return this.package[info];
+	}
 
-    getOutDirName(): string {
-        
-        if (this.name)
-            return this.name;
-            
-        if (this.getPackageInfo('name'))
-            return this.getPackageInfo('name');
+	getOutDirName(): string {
+		if (this.name) return this.name;
 
-        return undefined;
-    }
+		if (this.getPackageInfo('name')) return this.getPackageInfo('name');
 
-    getOutDirVersion(): string {
-        
-        if (this.version)
-            return this.version;
-            
-        if (this.getPackageInfo('version'))
-            return this.getPackageInfo('version');
+		return undefined;
+	}
 
-        return undefined;
-    }
+	getOutDirVersion(): string {
+		if (this.version) return this.version;
 
-    getBuild(name: string): MateConfigBuild{
+		if (this.getPackageInfo('version')) return this.getPackageInfo('version');
 
-        if (name === undefined || name === null || name === '')
-            name = 'dev';
-        
-        for(const build of this.builds)
-            if (build.name === name)
-                return build;
-    }
-    
-    setUndefined(): void {
+		return undefined;
+	}
 
-        // Builds
-        
-        let devBuildExists = false;
-    
-        this.builds.forEach((build: MateConfigBuild) => {
-    
-            if (build.name === 'dev')
-                devBuildExists = true;
+	getBuild(name: string): MateConfigBuild {
+		if (name === undefined || name === null || name === '') name = 'dev';
 
-                MateConfigBuild.setUndefined(build);
-    
-        });
+		for (const build of this.builds) if (build.name === name) return build;
+	}
 
-        if (!devBuildExists)
-        {
-            const devBuild = new MateConfigBuild('dev');
-            MateConfigBuild.setUndefined(devBuild);
+	setUndefined(): void {
+		// Builds
 
-            this.builds.push(devBuild);
-        }
+		let devBuildExists = false;
 
-        // Files
+		this.builds.forEach((build: MateConfigBuild) => {
+			if (build.name === 'dev') devBuildExists = true;
 
-        this.files.forEach((file: MateConfigFile) => {
-            if (file.builds === undefined)
-            {
-                file.builds = [];
-                file.builds.push('dev');
-            }
-        });
-    }
+			MateConfigBuild.setUndefined(build);
+		});
+
+		if (!devBuildExists) {
+			const devBuild = new MateConfigBuild('dev');
+			MateConfigBuild.setUndefined(devBuild);
+
+			this.builds.push(devBuild);
+		}
+
+		// Files
+
+		this.files.forEach((file: MateConfigFile) => {
+			if (file.builds === undefined) {
+				file.builds = [];
+				file.builds.push('dev');
+			}
+		});
+	}
 }
 
-export class MateConfigFile{
-    input: string[];
-    output: string[];
-    builds?: string[];
+export class MateConfigFile {
+	input: string[];
+	output: string[];
+	builds?: string[];
 
-    static hasExtension(input: string[], extension: string): boolean{
+	static hasExtension(input: string[], extension: string): boolean {
+		const mathExpression = new RegExp('\\.' + extension + '$');
 
-        const mathExpression = new RegExp('\\.' + extension + '$');
+		for (const path of input)
+			for (const file of glob.sync(path)) {
+				if (file.match(mathExpression)) return true;
+			}
 
-        for(const path of input)
-            for (const file of glob.sync(path)) {
-                if (file.match(mathExpression))
-                    return true;
-            }
-
-        return false;
-    }
+		return false;
+	}
 }
 
-export class MateConfigBuild{
-    name: string;
-    outDir?: string;
-    outDirVersioning?: boolean;
-    outDirName?: boolean;
-    css?: MateConfigCSSConfig;
-    js?: MateConfigJSConfig;
-    ts?: MateConfigTSConfig;
+export class MateConfigBuild {
+	name: string;
+	outDir?: string;
+	outDirVersioning?: boolean;
+	outDirName?: boolean;
+	css?: MateConfigCSSConfig;
+	js?: MateConfigJSConfig;
+	ts?: MateConfigTSConfig;
 
-    constructor(_name: string){
-        this.name = _name;
-    }
+	constructor(_name: string) {
+		this.name = _name;
+	}
 
-    static setUndefined(build: MateConfigBuild): void {
-    
-        if (!build.outDirVersioning)
-            build.outDirVersioning = false;
+	static setUndefined(build: MateConfigBuild): void {
+		if (!build.outDirVersioning) build.outDirVersioning = false;
 
-        if (!build.outDirName)
-            build.outDirName = false;
+		if (!build.outDirName) build.outDirName = false;
 
-        // CSS
+		// CSS
 
-        if (build.css === undefined)
-            build.css = new MateConfigCSSConfig();
-    
-        MateConfigCSSConfig.setUndefined(build.css);
-    
-        // JS
+		if (build.css === undefined) build.css = new MateConfigCSSConfig();
 
-        if (build.js === undefined)
-            build.js = new MateConfigJSConfig();
-    
-        MateConfigJSConfig.setUndefined(build.js);
-    
-        // TS
+		MateConfigCSSConfig.setUndefined(build.css);
 
-        if (build.ts === undefined)
-            build.ts = new MateConfigTSConfig();
-    
-        MateConfigTSConfig.setUndefined(build.ts);
-    }
+		// JS
+
+		if (build.js === undefined) build.js = new MateConfigJSConfig();
+
+		MateConfigJSConfig.setUndefined(build.js);
+
+		// TS
+
+		if (build.ts === undefined) build.ts = new MateConfigTSConfig();
+
+		MateConfigTSConfig.setUndefined(build.ts);
+	}
 }
 
-export class MateConfigBaseConfig{
-
-    outDirSuffix?: string;
+export class MateConfigBaseConfig {
+	outDirSuffix?: string;
 }
 
 export class MateConfigCSSConfig extends MateConfigBaseConfig {
+	minify?: boolean;
+	sourceMap?: boolean;
 
-    minify?: boolean;
-    sourceMap?: boolean;
+	static setUndefined(css: MateConfigCSSConfig): void {
+		if (css.minify === undefined) css.minify = true;
 
-    static setUndefined(css: MateConfigCSSConfig): void {
-    
-        if (css.minify === undefined)
-            css.minify = true;
-    
-        if (css.sourceMap === undefined)
-            css.sourceMap = false;
-    }
+		if (css.sourceMap === undefined) css.sourceMap = false;
+	}
 }
 
-export class MateConfigJSConfig extends MateConfigBaseConfig{
+export class MateConfigJSConfig extends MateConfigBaseConfig {
+	minify?: boolean;
+	sourceMap?: boolean;
+	declaration?: boolean;
+	webClean?: boolean;
 
-    minify?: boolean;
-    sourceMap?: boolean;
-    declaration?: boolean;
-    webClean?: boolean;
+	static setUndefined(js: MateConfigJSConfig): void {
+		if (js.minify === undefined) js.minify = true;
 
-    static setUndefined(js: MateConfigJSConfig): void {
-    
-        if (js.minify === undefined)
-            js.minify = true;
-    
-        if (js.sourceMap === undefined)
-            js.sourceMap = true;
-    
-        if (js.declaration === undefined)
-            js.declaration = true;
+		if (js.sourceMap === undefined) js.sourceMap = true;
 
-        if (js.webClean === undefined)
-            js.webClean = false;
-    }
+		if (js.declaration === undefined) js.declaration = true;
+
+		if (js.webClean === undefined) js.webClean = false;
+	}
 }
 
-export class MateConfigTSConfig extends MateConfigBaseConfig{
+export class MateConfigTSConfig extends MateConfigBaseConfig {
+	compilerOptions?: tsCompilerOptions;
 
-    compilerOptions?: tsCompilerOptions;
+	static declarationCompilerOptions(compilerOptions?: tsCompilerOptions): tsCompilerOptions {
+		var value: tsCompilerOptions = {};
 
-    static declarationCompilerOptions(compilerOptions?: tsCompilerOptions): tsCompilerOptions{
+		for (const key in compilerOptions) value[key] = compilerOptions[key];
 
-        var value:tsCompilerOptions = {};
+		value.declaration = true;
 
-        for (const key in compilerOptions)
-            value[key] = compilerOptions[key];
-    
-        value.declaration = true;
-            
-        return value ;
-    }
+		return value;
+	}
 
-    static setUndefined(ts: MateConfigTSConfig): void {
-    
-        if (ts.compilerOptions === undefined)
-            ts.compilerOptions = { };
-    }
+	static setUndefined(ts: MateConfigTSConfig): void {
+		if (ts.compilerOptions === undefined) ts.compilerOptions = {};
+	}
 }
 
-interface tsCompilerOptions{
-    // to be ignored
-    declaration?: boolean,
-    sourceMap?: boolean,
-    outDir?: string,
-    outFile?: string
+export class MateConfigFormatterConfig {
+	path: string | string[];
+}
+
+interface tsCompilerOptions {
+	// to be ignored
+	declaration?: boolean;
+	sourceMap?: boolean;
+	outDir?: string;
+	outFile?: string;
 }

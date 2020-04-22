@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var main_1 = require("./main");
 var fs = require("fs");
 var path = require("path");
 var minimist = require("minimist");
+var formatter_1 = require("./formatter");
+var config_1 = require("./config");
+var bundler_1 = require("./bundler");
 var matePackage;
 var setPackage = function () {
     matePackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json')).toString());
@@ -34,8 +36,15 @@ if (helpArgs) {
     console.log('-w, --watch\t\t watch defined inputs under the specified build(s)');
 }
 if (!versionArgs && !helpArgs) {
-    if (watchArgs)
-        main_1.watch(builds);
-    else
-        main_1.runBuild(builds);
+    var config = config_1.MateConfig.get();
+    if (config) {
+        if (watchArgs) {
+            bundler_1.MateBundler.watch(config, builds);
+            formatter_1.MateFormatter.watch(config);
+        }
+        else {
+            bundler_1.MateBundler.execute(config, builds);
+            formatter_1.MateFormatter.execute(config);
+        }
+    }
 }

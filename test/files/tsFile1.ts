@@ -1,7 +1,7 @@
-console.log('ts file 1');
+console.log("ts file 1");
 
 class Test1 {
-    FirstProperty: string;
+	FirstProperty: string;
 }
 
 export const testVariable = new Test1();

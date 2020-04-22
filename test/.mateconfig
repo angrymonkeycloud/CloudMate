@@ -1,4 +1,10 @@
 {
+    "format":{
+        "path":[
+            "files/*"
+        ]
+    },
+
     "builds": [{
             "name": "dev",
             "css": {

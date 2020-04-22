@@ -2,98 +2,73 @@ import through = require('through2');
 import vinyl = require('vinyl');
 
 module.exports = function (isDeclaration?: Boolean) {
+	if (isDeclaration === undefined) isDeclaration = false;
 
-    if (isDeclaration === undefined)
-        isDeclaration = false;
+	return through.obj(function (vinylFile: vinyl, encoding: string, callback: Function) {
+		const transformedFile = vinylFile.clone();
 
-    return through.obj(function (vinylFile: vinyl, encoding: string, callback: Function) {
+		let content = transformedFile.contents.toString();
 
-        const transformedFile = vinylFile.clone();
+		if (!isDeclaration) content = 'var exports = {};\n' + content;
 
-        let content = transformedFile.contents.toString();
+		content = CloudMateWebCleanJS.cleanLines(content);
 
-        if (!isDeclaration)
-            content = 'var exports = {};\n' + content;
-        
-        content = CloudMateWebCleanJS.cleanLines(content);
-        
-        if (!isDeclaration) {
-            content = CloudMateWebCleanJS.cleanPrefixes(content);
+		if (!isDeclaration) {
+			content = CloudMateWebCleanJS.cleanPrefixes(content);
 
-            const lines = content.split('\n');
+			const lines = content.split('\n');
 
-            const removables_Requires = [];
-            
-            for (let i = 0; i < lines.length; i++) {
+			const removables_Requires = [];
 
-                const line = lines[i];
+			for (let i = 0; i < lines.length; i++) {
+				const line = lines[i];
 
-                if (line.indexOf(' require(') === -1)
-                    continue;
+				if (line.indexOf(' require(') === -1) continue;
 
-                removables_Requires.push(line);
+				removables_Requires.push(line);
 
-                const prefix = line.split(' ')[1];
+				const prefix = line.split(' ')[1];
 
-                if (prefix.indexOf('_') !== -1)
-                    removables_Requires.push(prefix + '.');
-            }
+				if (prefix.indexOf('_') !== -1) removables_Requires.push(prefix + '.');
+			}
 
-            removables_Requires.forEach(function (value) {
+			removables_Requires.forEach(function (value) {
+				if (value.indexOf('=') === 0) return;
 
-                if (value.indexOf('=') === 0)
-                    return;
+				if (value.indexOf('=') !== -1) content = content.replace(value, '');
+				else content = content.replace(new RegExp(value.trim(), 'gi'), '');
+			});
+		}
 
-                if (value.indexOf('=') !== -1)
-                    content = content.replace(value, '');
-                else
-                    content = content.replace(new RegExp(value.trim(), 'gi'), '');
-            });
-        }
+		transformedFile.contents = new Buffer(content);
 
-        transformedFile.contents = new Buffer(content);
-
-        // 3. pass along transformed file for use in next `pipe()`
-        callback(null, transformedFile);
-
-    });
+		// 3. pass along transformed file for use in next `pipe()`
+		callback(null, transformedFile);
+	});
 };
 
 class CloudMateWebCleanJS {
+	static cleanLines(content: string): string {
+		const startWithValues = ['import '];
 
-    static cleanLines(content: string): string{
+		let result = '';
 
-        const startWithValues = [
-            'import '
-        ];
+		for (const line of content.split('\n')) {
+			let safe = true;
 
-        let result = '';
+			for (const startWith of startWithValues) if (line.startsWith(startWith)) safe = false;
 
-        for(const line of content.split('\n')){
-         
-            let safe = true;
-            
-            for(const startWith of startWithValues)
-                if (line.startsWith(startWith))
-                    safe = false;
-            
-            if (safe)
-                result += line + '\n';
-        }
+			if (safe) result += line + '\n';
+		}
 
-        return result;
-    }
+		return result;
+	}
 
-    static cleanPrefixes(content: string): string{
+	static cleanPrefixes(content: string): string {
+		const prefixesValues = ['export default ', 'export '];
 
-        const prefixesValues = [
-            'export default ',
-            'export '
-        ];
+		for (const prefix of prefixesValues) content = content.replace(new RegExp('^(' + prefix + ')|[[:blank:]]+(' + prefix + ')', 'gmi'), '');
 
-        for(const prefix of prefixesValues)
-            content = content.replace(new RegExp('^(' + prefix + ')|[[:blank:]]+(' + prefix + ')', 'gmi'), '');
-        
-        return content;
-    }
+		return content;
+	}
 }
