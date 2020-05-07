@@ -4,7 +4,8 @@ Compile, merge, optimize, and distribute static files including: TypeScript, Jav
 
 ## Highlights
 
-* Compile and distribute single or multiple files to a single or multiple output
+* Compile and distribute single or multiple files to a single or multiple output.
+* Compress images (jpeg, png, gif, and svg);
 * Create advanced configuration with simple JSON, YAML, or JavaScript configuration file, no coding required.
 * No need to add the package into the project package dependencies, just install it globally.
 
@@ -200,6 +201,20 @@ creates a sub directory for the specified file type.
 * It will run using the **dist** build only.
 
 And of course, it could be multiple inputs into multiple outputs.
+
+### Images
+
+```json
+{
+    "images":
+    [
+        {
+            "output": "test/img",
+            "input": "images/**"
+        }
+    ]
+}
+```
 
 ## CLI commands
 

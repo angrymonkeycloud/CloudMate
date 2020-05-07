@@ -5,6 +5,7 @@ import path = require('path');
 import minimist = require('minimist');
 import { MateConfig } from './config';
 import { MateBundler } from './bundler';
+import { MateCompressor } from './compressor';
 
 let matePackage: object;
 const setPackage = function () {
@@ -51,8 +52,10 @@ if (!versionArgs && !helpArgs) {
 	if (config) {
 		if (watchArgs) {
 			MateBundler.watch(config, builds);
+			MateCompressor.watch(config);
 		} else {
 			MateBundler.execute(config, builds);
+			MateCompressor.execute(config);
 		}
 	}
 }

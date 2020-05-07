@@ -49,6 +49,12 @@ var MateConfig = (function () {
                         else if (typeof fileInfo.builds === "string")
                             fileInfo.builds = [fileInfo.builds];
                     });
+                    result.config.images.forEach(function (fileInfo) {
+                        if (typeof fileInfo.output === "string")
+                            fileInfo.output = [fileInfo.output];
+                        if (typeof fileInfo.input === "string")
+                            fileInfo.input = [fileInfo.input];
+                    });
                     delete result.config.$schema;
                     return result;
                 },
@@ -86,6 +92,7 @@ var MateConfig = (function () {
         config.name = configJson.name;
         config.version = configJson.version;
         config.files = configJson.files;
+        config.images = configJson.images;
         config.builds = (_a = configJson.builds) !== null && _a !== void 0 ? _a : [];
         var tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
         if (tsConfigPath)
@@ -161,6 +168,12 @@ var MateConfigFile = (function () {
     return MateConfigFile;
 }());
 exports.MateConfigFile = MateConfigFile;
+var MateConfigImage = (function () {
+    function MateConfigImage() {
+    }
+    return MateConfigImage;
+}());
+exports.MateConfigImage = MateConfigImage;
 var MateConfigBuild = (function () {
     function MateConfigBuild(_name) {
         this.name = _name;

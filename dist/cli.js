@@ -6,6 +6,7 @@ var path = require("path");
 var minimist = require("minimist");
 var config_1 = require("./config");
 var bundler_1 = require("./bundler");
+var compressor_1 = require("./compressor");
 var matePackage;
 var setPackage = function () {
     matePackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json')).toString());
@@ -39,9 +40,11 @@ if (!versionArgs && !helpArgs) {
     if (config) {
         if (watchArgs) {
             bundler_1.MateBundler.watch(config, builds);
+            compressor_1.MateCompressor.watch(config);
         }
         else {
             bundler_1.MateBundler.execute(config, builds);
+            compressor_1.MateCompressor.execute(config);
         }
     }
 }

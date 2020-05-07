@@ -12,6 +12,7 @@ export class MateConfig {
 	version?: string;
 	files: MateConfigFile[];
 	builds: MateConfigBuild[];
+	images?: MateConfigImage[];
 
 	private constructor() { }
 
@@ -36,18 +37,26 @@ export class MateConfig {
 				if (typeof result.config !== 'object')
 					throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
 
-				result.config.files.forEach((fileInfo: MateConfigFile) => {
-					if (typeof fileInfo.output === "string")
-						fileInfo.output = [fileInfo.output];
+					result.config.files.forEach((fileInfo: MateConfigFile) => {
+						if (typeof fileInfo.output === "string")
+							fileInfo.output = [fileInfo.output];
+	
+						if (typeof fileInfo.input === "string")
+							fileInfo.input = [fileInfo.input];
+	
+						if (!fileInfo.builds)
+							fileInfo.builds = ['dev'];
+						else if (typeof fileInfo.builds === "string")
+							fileInfo.builds = [fileInfo.builds];
+					});
 
-					if (typeof fileInfo.input === "string")
-						fileInfo.input = [fileInfo.input];
-
-					if (!fileInfo.builds)
-						fileInfo.builds = ['dev'];
-					else if (typeof fileInfo.builds === "string")
-						fileInfo.builds = [fileInfo.builds];
-				});
+					result.config.images.forEach((fileInfo: MateConfigImage) => {
+						if (typeof fileInfo.output === "string")
+							fileInfo.output = [fileInfo.output];
+	
+						if (typeof fileInfo.input === "string")
+							fileInfo.input = [fileInfo.input];
+					});
 
 				delete result.config.$schema;
 
@@ -88,6 +97,7 @@ export class MateConfig {
 		config.name = configJson.name;
 		config.version = configJson.version;
 		config.files = configJson.files;
+		config.images = configJson.images;
 		config.builds = configJson.builds ?? [];
 
 		// TS Config
@@ -172,11 +182,17 @@ export class MateConfigFile {
 
 		for (const path of input)
 			for (const file of glob.sync(path)) {
-				if (file.match(mathExpression)) return true;
+				if (file.match(mathExpression))
+					return true;
 			}
 
 		return false;
 	}
+}
+
+export class MateConfigImage{
+	input: string[];
+	output: string[];
 }
 
 export class MateConfigBuild {
