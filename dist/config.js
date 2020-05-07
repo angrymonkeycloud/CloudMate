@@ -18,13 +18,7 @@ var glob = require("glob");
 var cosmiconfig_1 = require("cosmiconfig");
 var ts = require("typescript");
 var MateConfig = (function () {
-    function MateConfig(_name, _version, _files, _builds) {
-        this.name = _name;
-        this.version = _version;
-        this.files = _files;
-        this.builds = _builds;
-        if (this.builds === undefined)
-            this.builds = [];
+    function MateConfig() {
     }
     Object.defineProperty(MateConfig, "configurationExplorer", {
         get: function () {
@@ -45,6 +39,16 @@ var MateConfig = (function () {
                         return result;
                     if (typeof result.config !== 'object')
                         throw new Error("Config is only allowed to be an object, but received " + typeof result.config + " in \"" + result.filepath + "\"");
+                    result.config.files.forEach(function (fileInfo) {
+                        if (typeof fileInfo.output === "string")
+                            fileInfo.output = [fileInfo.output];
+                        if (typeof fileInfo.input === "string")
+                            fileInfo.input = [fileInfo.input];
+                        if (!fileInfo.builds)
+                            fileInfo.builds = ['dev'];
+                        else if (typeof fileInfo.builds === "string")
+                            fileInfo.builds = [fileInfo.builds];
+                    });
                     delete result.config.$schema;
                     return result;
                 },
@@ -69,6 +73,7 @@ var MateConfig = (function () {
         configurable: true
     });
     MateConfig.get = function () {
+        var _a;
         var configurationFile = MateConfig.availableConfigurationFile;
         if (!configurationFile)
             return null;
@@ -77,8 +82,11 @@ var MateConfig = (function () {
         configJson = result.config;
         if (!configJson)
             throw new Error('Error parsing configuration file.');
-        var config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
-        config.format = configJson.format;
+        var config = new MateConfig();
+        config.name = configJson.name;
+        config.version = configJson.version;
+        config.files = configJson.files;
+        config.builds = (_a = configJson.builds) !== null && _a !== void 0 ? _a : [];
         var tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
         if (tsConfigPath)
             config.builds.forEach(function (build) {
@@ -131,12 +139,6 @@ var MateConfig = (function () {
             MateConfigBuild.setUndefined(devBuild);
             this.builds.push(devBuild);
         }
-        this.files.forEach(function (file) {
-            if (file.builds === undefined) {
-                file.builds = [];
-                file.builds.push('dev');
-            }
-        });
     };
     return MateConfig;
 }());

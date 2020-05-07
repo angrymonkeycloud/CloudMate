@@ -36,23 +36,20 @@
         }
     ],
     "files": [{
-            "output": ["devfolder/yess.css"],
+            "output": "devfolder/yess.css",
             "input": [
                 "files/cssFile.css",
                 "files/lessFile1.less",
                 "files/lessFile2.less",
                 "files/saasFile.scss"
-            ],
-            "builds": ["dev", "dist"]
+            ]
         }, {
-            "output": ["devfolder/site.js"],
-            "input": [
-                "files/jsFile1.js"
-            ],
+            "output": "devfolder/site.js",
+            "input": "files/jsFile1.js",
             "builds": ["dev", "dist"]
         },
         {
-            "output": ["devfolder/js/site.js"],
+            "output": "devfolder/js/site.js",
             "input": [
                 "files/tsFile1.ts",
                 "files/tsFile2.ts"
@@ -60,16 +57,14 @@
             "builds": ["dev", "dist"]
         },
         {
-            "output": ["devfolder/variables.less"],
-            "input": [
-                "files/variables.less"
-            ],
+            "output": "devfolder/variables.less",
+            "input": "files/variables.less",
             "builds": ["dev", "dist"]
         },
         {
-            "output": ["README.md"],
-            "input": ["README.md"],
-            "builds": ["dist"]
+            "output": "README.md",
+            "input": "README.md",
+            "builds": "dist"
         }
     ]
 }

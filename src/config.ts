@@ -5,7 +5,16 @@ import { CosmiconfigResult } from 'cosmiconfig/dist/types';
 import * as ts from "typescript";
 
 export class MateConfig {
+
 	private static _configurationExplorer;
+
+	name?: string;
+	version?: string;
+	files: MateConfigFile[];
+	builds: MateConfigBuild[];
+
+	private constructor() { }
+
 	private static get configurationExplorer() {
 		if (this._configurationExplorer !== undefined) return this._configurationExplorer;
 
@@ -20,9 +29,25 @@ export class MateConfig {
 				'package.json',
 			],
 			transform: (result) => {
-				if (!result || !result.config) return result;
 
-				if (typeof result.config !== 'object') throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
+				if (!result || !result.config)
+					return result;
+
+				if (typeof result.config !== 'object')
+					throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
+
+				result.config.files.forEach((fileInfo: MateConfigFile) => {
+					if (typeof fileInfo.output === "string")
+						fileInfo.output = [fileInfo.output];
+
+					if (typeof fileInfo.input === "string")
+						fileInfo.input = [fileInfo.input];
+
+					if (!fileInfo.builds)
+						fileInfo.builds = ['dev'];
+					else if (typeof fileInfo.builds === "string")
+						fileInfo.builds = [fileInfo.builds];
+				});
 
 				delete result.config.$schema;
 
@@ -47,17 +72,25 @@ export class MateConfig {
 	static get(): MateConfig {
 		const configurationFile = MateConfig.availableConfigurationFile;
 
-		if (!configurationFile) return null;
+		if (!configurationFile)
+			return null;
 
 		let configJson: MateConfig;
 
 		const result: CosmiconfigResult = this.configurationExplorer.load(configurationFile);
 		configJson = result.config;
 
-		if (!configJson) throw new Error('Error parsing configuration file.');
+		if (!configJson)
+			throw new Error('Error parsing configuration file.');
 
-		let config = new MateConfig(configJson.name, configJson.version, configJson.files, configJson.builds);
-		config.format = configJson.format;
+		let config = new MateConfig();
+
+		config.name = configJson.name;
+		config.version = configJson.version;
+		config.files = configJson.files;
+		config.builds = configJson.builds ?? [];
+
+		// TS Config
 
 		const tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
 
@@ -71,36 +104,26 @@ export class MateConfig {
 		return config;
 	}
 
-	private constructor(_name: string, _version: string, _files: MateConfigFile[], _builds: MateConfigBuild[]) {
-		this.name = _name;
-		this.version = _version;
-		this.files = _files;
-		this.builds = _builds;
-
-		if (this.builds === undefined) this.builds = [];
-	}
-
-	name?: string;
-	version?: string;
-	files: MateConfigFile[];
-	builds: MateConfigBuild[];
-	format?: MateConfigFormatterConfig;
-
 	private package: object;
 	private setPackage() {
 		this.package = JSON.parse(fs.readFileSync('package.json').toString());
 	}
 
 	private getPackageInfo(info: string) {
-		if (!this.package) this.setPackage();
+
+		if (!this.package)
+			this.setPackage();
 
 		return this.package[info];
 	}
 
 	getOutDirName(): string {
-		if (this.name) return this.name;
 
-		if (this.getPackageInfo('name')) return this.getPackageInfo('name');
+		if (this.name)
+			return this.name;
+
+		if (this.getPackageInfo('name'))
+			return this.getPackageInfo('name');
 
 		return undefined;
 	}
@@ -136,15 +159,6 @@ export class MateConfig {
 
 			this.builds.push(devBuild);
 		}
-
-		// Files
-
-		this.files.forEach((file: MateConfigFile) => {
-			if (file.builds === undefined) {
-				file.builds = [];
-				file.builds.push('dev');
-			}
-		});
 	}
 }
 

@@ -45,8 +45,8 @@ JSON Configuration file sample content:
     "files":  
     [
         {
-            "output": ["dist/index.js"],
-            "input": ["src/index.ts"]
+            "output": "dist/index.js",
+            "input": "src/index.ts"
         }
     ]
 }
@@ -103,11 +103,6 @@ Default build's name is **dev**, so if the developer didn't specify the build of
                 "outDirSuffix": "js",
                 "minify": true,
                 "sourceMap": false
-            },
-            "ts": {
-                "compilerOptions": {
-                    "declaration": true
-                }
             }
         }
     ],
@@ -160,12 +155,10 @@ creates a sub directory for the specified file type.
     [
         {
             "output": ["test/temp.txt", "test/temp2.txt"],
-            "input": [
-                "files/temp1.txt"
-            ]
+            "input": "files/temp1.txt"
         },
         {
-            "output": ["test/site.css"],
+            "output": "test/site.css",
             "input": [
                 "files/cssFile.css",
                 "files/lessFile1.less",
@@ -175,7 +168,7 @@ creates a sub directory for the specified file type.
             "builds": ["dev", "dist"]
         },
         {
-            "output": ["test/site.js"],
+            "output": "test/site.js",
             "input": [
                 "files/tsFile1.ts",
                 "files/tsFile2.ts"
@@ -183,9 +176,9 @@ creates a sub directory for the specified file type.
             "builds": ["dev", "dist"]
         },
         {
-            "output": ["README.md"],
-            "input": ["README.md"],
-            "builds": ["dist"]
+            "output": "README.md",
+            "input": "README.md",
+            "builds": "dist"
         }
     ]
 }

@@ -23,27 +23,27 @@
 	],
 	"files": [
 		{
-			"input": ["src/clean.ts"],
-			"output": ["test/clean.js"]
+			"input": "src/clean.ts",
+			"output": "test/clean.js"
 		},
 		{
-			"input": ["src/config.ts"],
-			"output": ["test/config.js"],
+			"input": "src/config.ts",
+			"output": "test/config.js",
 			"builds": ["dev", "dist"]
 		},
 		{
-			"input": ["src/bundler.ts"],
-			"output": ["test/bundler.js"],
+			"input": "src/bundler.ts",
+			"output": "test/bundler.js",
 			"builds": ["dev", "dist"]
 		},
 		{
-			"input": ["src/cli.ts"],
-			"output": ["test/cli.js"],
+			"input": "src/cli.ts",
+			"output": "test/cli.js",
 			"builds": ["dev", "dist"]
 		},
 		{
-			"input": ["src/webcleanjs.ts"],
-			"output": ["test/webcleanjs.js"],
+			"input": "src/webcleanjs.ts",
+			"output": "test/webcleanjs.js",
 			"builds": ["dev", "dist"]
 		}
 	]
