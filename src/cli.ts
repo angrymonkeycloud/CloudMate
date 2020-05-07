@@ -3,7 +3,6 @@
 import fs = require('fs');
 import path = require('path');
 import minimist = require('minimist');
-import { MateFormatter } from './formatter';
 import { MateConfig } from './config';
 import { MateBundler } from './bundler';
 
@@ -52,10 +51,8 @@ if (!versionArgs && !helpArgs) {
 	if (config) {
 		if (watchArgs) {
 			MateBundler.watch(config, builds);
-			MateFormatter.watch(config);
 		} else {
 			MateBundler.execute(config, builds);
-			MateFormatter.execute(config);
 		}
 	}
 }

@@ -37,11 +37,6 @@
 			"builds": ["dev", "dist"]
 		},
 		{
-			"input": ["src/formatter.ts"],
-			"output": ["test/formatter.js"],
-			"builds": ["dev", "dist"]
-		},
-		{
 			"input": ["src/cli.ts"],
 			"output": ["test/cli.js"],
 			"builds": ["dev", "dist"]

@@ -4,7 +4,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var fs = require("fs");
 var path = require("path");
 var minimist = require("minimist");
-var formatter_1 = require("./formatter");
 var config_1 = require("./config");
 var bundler_1 = require("./bundler");
 var matePackage;
@@ -40,11 +39,9 @@ if (!versionArgs && !helpArgs) {
     if (config) {
         if (watchArgs) {
             bundler_1.MateBundler.watch(config, builds);
-            formatter_1.MateFormatter.watch(config);
         }
         else {
             bundler_1.MateBundler.execute(config, builds);
-            formatter_1.MateFormatter.execute(config);
         }
     }
 }
