@@ -37,23 +37,25 @@ export class MateConfig {
 				if (typeof result.config !== 'object')
 					throw new Error(`Config is only allowed to be an object, but received ${typeof result.config} in "${result.filepath}"`);
 
+				if (result.config.files)
 					result.config.files.forEach((fileInfo: MateConfigFile) => {
 						if (typeof fileInfo.output === "string")
 							fileInfo.output = [fileInfo.output];
-	
+
 						if (typeof fileInfo.input === "string")
 							fileInfo.input = [fileInfo.input];
-	
+
 						if (!fileInfo.builds)
 							fileInfo.builds = ['dev'];
 						else if (typeof fileInfo.builds === "string")
 							fileInfo.builds = [fileInfo.builds];
 					});
 
+				if (result.config.images)
 					result.config.images.forEach((fileInfo: MateConfigImage) => {
 						if (typeof fileInfo.output === "string")
 							fileInfo.output = [fileInfo.output];
-	
+
 						if (typeof fileInfo.input === "string")
 							fileInfo.input = [fileInfo.input];
 					});
@@ -190,7 +192,7 @@ export class MateConfigFile {
 	}
 }
 
-export class MateConfigImage{
+export class MateConfigImage {
 	input: string[];
 	output: string[];
 }

@@ -19,6 +19,8 @@ var MateBundler = (function () {
     function MateBundler() {
     }
     MateBundler.execute = function (config, builds) {
+        if (!config.files)
+            return;
         console.log('executed at ' + new Date().toTimeString());
         config.files.forEach(function (file) {
             MateBundler.runFiles(config, file, builds);
@@ -26,6 +28,8 @@ var MateBundler = (function () {
     };
     MateBundler.watch = function (config, builds) {
         var _this = this;
+        if (!config.files)
+            return;
         if (builds === undefined || (builds !== null && builds.length === 0))
             builds = ['dev'];
         var configWatcher = chokidar.watch(config_1.MateConfig.availableConfigurationFile, { persistent: true }).on('change', function (event, path) {

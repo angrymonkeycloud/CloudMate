@@ -18,6 +18,10 @@ export class MateBundler {
 	static allWatchers: chokidar.FSWatcher[] = [];
 
 	static execute(config?: MateConfig, builds?: string[]): void {
+
+		if (!config.files)
+			return;
+
 		console.log('executed at ' + new Date().toTimeString());
 
 		config.files.forEach((file): void => {
@@ -26,6 +30,10 @@ export class MateBundler {
 	}
 
 	static watch(config: MateConfig, builds?: string[]) {
+
+		if (!config.files)
+			return;
+
 		if (builds === undefined || (builds !== null && builds.length === 0)) builds = ['dev'];
 
 		const configWatcher = chokidar.watch(MateConfig.availableConfigurationFile, { persistent: true }).on('change', (event, path: string) => {

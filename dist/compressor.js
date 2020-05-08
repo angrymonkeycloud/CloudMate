@@ -58,8 +58,8 @@ var MateCompressor = (function () {
                 watchPaths.push(path);
             });
             var watch = chokidar.watch(watchPaths, { persistent: true })
-                .on('add', function () { _this.compress(file, config); })
-                .on('change', function () { _this.compress(file, config); });
+                .on('add', function () { _this.compress(file); })
+                .on('change', function () { _this.compress(file, true); });
             _this.allWatchers.push(watch);
         });
         this.execute(config);
@@ -68,7 +68,7 @@ var MateCompressor = (function () {
         if (config.images === undefined)
             return;
         config.images.forEach(function (image) {
-            MateCompressor.compress(image, config);
+            MateCompressor.compress(image);
         });
     };
     MateCompressor.isFile = function (filePath) {
@@ -76,7 +76,8 @@ var MateCompressor = (function () {
             return false;
         return fs.statSync(filePath).isFile();
     };
-    MateCompressor.compress = function (image, config) {
+    MateCompressor.compress = function (image, override) {
+        if (override === void 0) { override = false; }
         return __awaiter(this, void 0, void 0, function () {
             var _loop_1, this_1, _i, _a, output;
             var _this = this;
@@ -85,7 +86,7 @@ var MateCompressor = (function () {
                     var _loop_2 = function (input) {
                         var baseDirectory = !this_1.isFile(input) ? path.dirname(input) : null;
                         glob.sync(input, { nodir: true }).forEach(function (file) { return __awaiter(_this, void 0, void 0, function () {
-                            var fileExtention, plugins, destination, outputFileName;
+                            var fileExtention, plugins, destination, doCompress, outputFileName;
                             return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0:
@@ -113,8 +114,13 @@ var MateCompressor = (function () {
                                         destination = output;
                                         if (baseDirectory)
                                             destination = output + path.dirname(file).substring(baseDirectory.length);
-                                        outputFileName = file.replace(/^.*[\\\/]/, '');
-                                        if (!!fs.existsSync(destination + '/' + outputFileName)) return [3, 2];
+                                        doCompress = true;
+                                        if (!override) {
+                                            outputFileName = file.replace(/^.*[\\\/]/, '');
+                                            if (fs.existsSync(destination + '/' + outputFileName))
+                                                doCompress = false;
+                                        }
+                                        if (!doCompress) return [3, 2];
                                         return [4, imagemin([file], {
                                                 destination: destination,
                                                 plugins: plugins,

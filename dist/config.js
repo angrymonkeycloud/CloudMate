@@ -39,22 +39,24 @@ var MateConfig = (function () {
                         return result;
                     if (typeof result.config !== 'object')
                         throw new Error("Config is only allowed to be an object, but received " + typeof result.config + " in \"" + result.filepath + "\"");
-                    result.config.files.forEach(function (fileInfo) {
-                        if (typeof fileInfo.output === "string")
-                            fileInfo.output = [fileInfo.output];
-                        if (typeof fileInfo.input === "string")
-                            fileInfo.input = [fileInfo.input];
-                        if (!fileInfo.builds)
-                            fileInfo.builds = ['dev'];
-                        else if (typeof fileInfo.builds === "string")
-                            fileInfo.builds = [fileInfo.builds];
-                    });
-                    result.config.images.forEach(function (fileInfo) {
-                        if (typeof fileInfo.output === "string")
-                            fileInfo.output = [fileInfo.output];
-                        if (typeof fileInfo.input === "string")
-                            fileInfo.input = [fileInfo.input];
-                    });
+                    if (result.config.files)
+                        result.config.files.forEach(function (fileInfo) {
+                            if (typeof fileInfo.output === "string")
+                                fileInfo.output = [fileInfo.output];
+                            if (typeof fileInfo.input === "string")
+                                fileInfo.input = [fileInfo.input];
+                            if (!fileInfo.builds)
+                                fileInfo.builds = ['dev'];
+                            else if (typeof fileInfo.builds === "string")
+                                fileInfo.builds = [fileInfo.builds];
+                        });
+                    if (result.config.images)
+                        result.config.images.forEach(function (fileInfo) {
+                            if (typeof fileInfo.output === "string")
+                                fileInfo.output = [fileInfo.output];
+                            if (typeof fileInfo.input === "string")
+                                fileInfo.input = [fileInfo.input];
+                        });
                     delete result.config.$schema;
                     return result;
                 },

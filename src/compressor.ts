@@ -27,8 +27,8 @@ export class MateCompressor {
 			});
 
 			const watch = chokidar.watch(watchPaths, { persistent: true })
-				.on('add', () => { this.compress(file, config); })
-				.on('change', () => { this.compress(file, config); });
+				.on('add', () => { this.compress(file); })
+				.on('change', () => { this.compress(file, true); });
 
 			this.allWatchers.push(watch);
 		});
@@ -42,7 +42,7 @@ export class MateCompressor {
 			return;
 
 		config.images.forEach((image): void => {
-			MateCompressor.compress(image, config);
+			MateCompressor.compress(image);
 		});
 	}
 
@@ -54,7 +54,7 @@ export class MateCompressor {
 		return fs.statSync(filePath).isFile();
 	}
 
-	static async compress(image: MateConfigImage, config: MateConfig) {
+	static async compress(image: MateConfigImage, override: boolean = false) {
 
 		for (const output of image.output)
 			for (const input of image.input) {
@@ -98,9 +98,16 @@ export class MateCompressor {
 					if (baseDirectory)
 						destination = output + path.dirname(file).substring(baseDirectory.length);
 
-					const outputFileName = file.replace(/^.*[\\\/]/, '');
+					let doCompress = true;
 
-					if (!fs.existsSync(destination + '/' + outputFileName))
+					if (!override) {
+						const outputFileName = file.replace(/^.*[\\\/]/, '');
+
+						if (fs.existsSync(destination + '/' + outputFileName))
+							doCompress = false;
+					}
+
+					if (doCompress)
 						await imagemin([file], {
 							destination: destination,
 							plugins: plugins,
