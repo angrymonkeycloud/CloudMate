@@ -8,7 +8,7 @@ import mozjpeg = require('imagemin-mozjpeg');
 import optipng = require('imagemin-optipng');
 import gifsicle = require('imagemin-gifsicle');
 import glob = require('glob');
-
+import del = require('del');
 
 export class MateCompressor {
 	static allWatchers: chokidar.FSWatcher[] = [];
@@ -27,6 +27,7 @@ export class MateCompressor {
 			});
 
 			const watch = chokidar.watch(watchPaths, { persistent: true })
+				.on('unlink', (filePath) => { this.delete(file, filePath); })
 				.on('add', () => { this.compress(file); })
 				.on('change', () => { this.compress(file, true); });
 
@@ -114,6 +115,25 @@ export class MateCompressor {
 							glob: false
 						});
 				})
+			}
+	}
+
+	static async delete(image: MateConfigImage, filePath: string) {
+
+		for (const output of image.output)
+			for (const input of image.input) {
+
+				const baseDirectory = !this.isFile(input) ? path.dirname(input) : null;
+
+				let destination = output;
+
+				if (baseDirectory)
+					destination = output + path.dirname(filePath).substring(baseDirectory.length);
+
+				const outputFileName = filePath.replace(/^.*[\\\/]/, '');
+				const fileToDelete = destination + '/' + outputFileName;
+
+				del(fileToDelete);
 			}
 	}
 }

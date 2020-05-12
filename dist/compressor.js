@@ -45,6 +45,7 @@ var mozjpeg = require("imagemin-mozjpeg");
 var optipng = require("imagemin-optipng");
 var gifsicle = require("imagemin-gifsicle");
 var glob = require("glob");
+var del = require("del");
 var MateCompressor = (function () {
     function MateCompressor() {
     }
@@ -58,6 +59,7 @@ var MateCompressor = (function () {
                 watchPaths.push(path);
             });
             var watch = chokidar.watch(watchPaths, { persistent: true })
+                .on('unlink', function (filePath) { _this.delete(file, filePath); })
                 .on('add', function () { _this.compress(file); })
                 .on('change', function () { _this.compress(file, true); });
             _this.allWatchers.push(watch);
@@ -143,6 +145,27 @@ var MateCompressor = (function () {
                 for (_i = 0, _a = image.output; _i < _a.length; _i++) {
                     output = _a[_i];
                     _loop_1(output);
+                }
+                return [2];
+            });
+        });
+    };
+    MateCompressor.delete = function (image, filePath) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _i, _a, output, _b, _c, input, baseDirectory, destination, outputFileName, fileToDelete;
+            return __generator(this, function (_d) {
+                for (_i = 0, _a = image.output; _i < _a.length; _i++) {
+                    output = _a[_i];
+                    for (_b = 0, _c = image.input; _b < _c.length; _b++) {
+                        input = _c[_b];
+                        baseDirectory = !this.isFile(input) ? path.dirname(input) : null;
+                        destination = output;
+                        if (baseDirectory)
+                            destination = output + path.dirname(filePath).substring(baseDirectory.length);
+                        outputFileName = filePath.replace(/^.*[\\\/]/, '');
+                        fileToDelete = destination + '/' + outputFileName;
+                        del(fileToDelete);
+                    }
                 }
                 return [2];
             });
