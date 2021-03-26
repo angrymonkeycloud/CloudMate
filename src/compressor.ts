@@ -141,6 +141,9 @@ export class MateCompressor {
 			return;
 
 		const image = MateCompressor.queue.shift();
+		var date = new Date();
+		var time = date.getHours() + ":" + date.getSeconds();
+		console.log("start: " + image.filePath + " @ " + time);
 
 		const result = imagemin([image.filePath], {
 			destination: image.destination,
@@ -149,6 +152,9 @@ export class MateCompressor {
 		});
 
 		result.then((e) => {
+			date = new Date();
+			time = date.getHours() + ":" + date.getSeconds();
+			console.log("end: " + image.filePath + " @ " + time);
 			MateCompressor.compressImages();
 		})
 
