@@ -20,6 +20,7 @@ class ImageQueue {
 export class MateCompressor {
 	static allWatchers: chokidar.FSWatcher[] = [];
 	static queue: ImageQueue[] = [];
+	static compressionInProgress = false;
 	static watch(config: MateConfig) {
 
 		if (config.images === undefined)
@@ -125,11 +126,23 @@ export class MateCompressor {
 
 
 					if (doCompress) {
-						const image = new ImageQueue();
-						image.filePath = file;
-						image.destination = destination;
-						image.plugins = plugins;
-						MateCompressor.queue.push(image);
+						let alreadyQueued = false;
+
+						MateCompressor.queue.forEach(element => {
+							if(element.filePath == file){
+								alreadyQueued = true;
+								return;
+							}
+						});
+
+						if(!alreadyQueued){
+							const image = new ImageQueue();
+							image.filePath = file;
+							image.destination = destination;
+							image.plugins = plugins;
+							MateCompressor.queue.push(image);
+						}
+						
 					}
 				})
 			}
@@ -138,11 +151,20 @@ export class MateCompressor {
 	static compressImages() {
 
 		if (MateCompressor.queue.length == 0)
+		{
+			MateCompressor.compressionInProgress = false;
 			return;
+		}
+
+		if (MateCompressor.compressionInProgress)
+			return;
+
+		MateCompressor.compressionInProgress = true;
 
 		const image = MateCompressor.queue.shift();
 		var date = new Date();
 		var time = date.getHours() + ":" + date.getSeconds();
+
 		console.log("start: " + image.filePath + " @ " + time);
 
 		const result = imagemin([image.filePath], {
@@ -155,12 +177,14 @@ export class MateCompressor {
 			date = new Date();
 			time = date.getHours() + ":" + date.getSeconds();
 			console.log("end: " + image.filePath + " @ " + time);
+			console.log("------------------");
 			MateCompressor.compressImages();
-		})
+		});
 
 		result.catch((e) => {
 			console.log(e);
-		})
+			MateCompressor.compressImages();
+		});
 	}
 
 	static async delete(image: MateConfigImage, filePath: string) {
