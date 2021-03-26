@@ -33,7 +33,7 @@ npm i -g cloudmate
 .mateconfig.yml,
 
 // JavaScipt
-.mateconfig.json,
+.mateconfig.js,
 
 // JSON under "mateconfig" property
 package.json

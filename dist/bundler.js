@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MateBundler = void 0;
 var path = require('path');
 var config_1 = require("./config");
 var chokidar = require("chokidar");
