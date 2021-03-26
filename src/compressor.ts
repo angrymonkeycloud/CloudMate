@@ -151,6 +151,10 @@ export class MateCompressor {
 		result.then((e) => {
 			MateCompressor.compressImages();
 		})
+
+		result.catch((e) => {
+			console.log(e);
+		})
 	}
 
 	static async delete(image: MateConfigImage, filePath: string) {
