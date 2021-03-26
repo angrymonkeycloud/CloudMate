@@ -36,6 +36,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MateCompressor = void 0;
 var fs = require("fs");
 var path = require("path");
 var chokidar = require("chokidar");
@@ -46,6 +47,11 @@ var optipng = require("imagemin-optipng");
 var gifsicle = require("imagemin-gifsicle");
 var glob = require("glob");
 var del = require("del");
+var ImageQueue = (function () {
+    function ImageQueue() {
+    }
+    return ImageQueue;
+}());
 var MateCompressor = (function () {
     function MateCompressor() {
     }
@@ -60,8 +66,14 @@ var MateCompressor = (function () {
             });
             var watch = chokidar.watch(watchPaths, { persistent: true })
                 .on('unlink', function (filePath) { _this.delete(file, filePath); })
-                .on('add', function () { _this.compress(file); })
-                .on('change', function () { _this.compress(file, true); });
+                .on('add', function () {
+                _this.queueImages(file);
+                MateCompressor.compressImages();
+            })
+                .on('change', function () {
+                _this.queueImages(file, true);
+                MateCompressor.compressImages();
+            });
             _this.allWatchers.push(watch);
         });
         this.execute(config);
@@ -70,15 +82,16 @@ var MateCompressor = (function () {
         if (config.images === undefined)
             return;
         config.images.forEach(function (image) {
-            MateCompressor.compress(image);
+            MateCompressor.queueImages(image);
         });
+        MateCompressor.compressImages();
     };
     MateCompressor.isFile = function (filePath) {
         if (!fs.existsSync(filePath))
             return false;
         return fs.statSync(filePath).isFile();
     };
-    MateCompressor.compress = function (image, override) {
+    MateCompressor.queueImages = function (image, override) {
         if (override === void 0) { override = false; }
         return __awaiter(this, void 0, void 0, function () {
             var _loop_1, this_1, _i, _a, output;
@@ -88,51 +101,48 @@ var MateCompressor = (function () {
                     var _loop_2 = function (input) {
                         var baseDirectory = !this_1.isFile(input) ? path.dirname(input) : null;
                         glob.sync(input, { nodir: true }).forEach(function (file) { return __awaiter(_this, void 0, void 0, function () {
-                            var fileExtention, plugins, destination, doCompress, outputFileName;
+                            var fileExtention, plugins, destination, doCompress, outputFileName, image_1;
                             return __generator(this, function (_a) {
-                                switch (_a.label) {
-                                    case 0:
-                                        fileExtention = file.split('.').pop().toLowerCase();
-                                        plugins = [];
-                                        switch (fileExtention) {
-                                            case "svg":
-                                                plugins.push(svgo());
-                                                break;
-                                            case "png":
-                                                plugins.push(optipng());
-                                                break;
-                                            case "jpeg":
-                                            case "jpg":
-                                                plugins.push(mozjpeg());
-                                                break;
-                                            case "gif":
-                                                plugins.push(gifsicle());
-                                                break;
-                                            default:
-                                                break;
-                                        }
-                                        if (plugins.length === 0)
-                                            return [2];
-                                        destination = output;
-                                        if (baseDirectory)
-                                            destination = output + path.dirname(file).substring(baseDirectory.length);
-                                        doCompress = true;
-                                        if (!override) {
-                                            outputFileName = file.replace(/^.*[\\\/]/, '');
-                                            if (fs.existsSync(destination + '/' + outputFileName))
-                                                doCompress = false;
-                                        }
-                                        if (!doCompress) return [3, 2];
-                                        return [4, imagemin([file], {
-                                                destination: destination,
-                                                plugins: plugins,
-                                                glob: false
-                                            })];
-                                    case 1:
-                                        _a.sent();
-                                        _a.label = 2;
-                                    case 2: return [2];
+                                if (MateCompressor.queue.map(function (obj) { return obj.filePath; }).indexOf(file) !== -1)
+                                    return [2];
+                                fileExtention = file.split('.').pop().toLowerCase();
+                                plugins = [];
+                                switch (fileExtention) {
+                                    case "svg":
+                                        plugins.push(svgo());
+                                        break;
+                                    case "png":
+                                        plugins.push(optipng());
+                                        break;
+                                    case "jpeg":
+                                    case "jpg":
+                                        plugins.push(mozjpeg());
+                                        break;
+                                    case "gif":
+                                        plugins.push(gifsicle());
+                                        break;
+                                    default:
+                                        break;
                                 }
+                                if (plugins.length === 0)
+                                    return [2];
+                                destination = output;
+                                if (baseDirectory)
+                                    destination = output + path.dirname(file).substring(baseDirectory.length);
+                                doCompress = true;
+                                if (!override) {
+                                    outputFileName = file.replace(/^.*[\\\/]/, '');
+                                    if (fs.existsSync(destination + '/' + outputFileName))
+                                        doCompress = false;
+                                }
+                                if (doCompress) {
+                                    image_1 = new ImageQueue();
+                                    image_1.filePath = file;
+                                    image_1.destination = destination;
+                                    image_1.plugins = plugins;
+                                    MateCompressor.queue.push(image_1);
+                                }
+                                return [2];
                             });
                         }); });
                     };
@@ -148,6 +158,28 @@ var MateCompressor = (function () {
                 }
                 return [2];
             });
+        });
+    };
+    MateCompressor.compressImages = function (isContinuous) {
+        if (isContinuous === void 0) { isContinuous = false; }
+        if (MateCompressor.queue.length == 0) {
+            MateCompressor.compressionInProgress = false;
+            return;
+        }
+        if (!isContinuous && MateCompressor.compressionInProgress)
+            return;
+        MateCompressor.compressionInProgress = true;
+        var image = MateCompressor.queue.shift();
+        var result = imagemin([image.filePath], {
+            destination: image.destination,
+            plugins: image.plugins,
+            glob: false
+        });
+        result.then(function (e) {
+            MateCompressor.compressImages(true);
+        });
+        result.catch(function (e) {
+            MateCompressor.compressImages(true);
         });
     };
     MateCompressor.delete = function (image, filePath) {
@@ -172,6 +204,8 @@ var MateCompressor = (function () {
         });
     };
     MateCompressor.allWatchers = [];
+    MateCompressor.queue = [];
+    MateCompressor.compressionInProgress = false;
     return MateCompressor;
 }());
 exports.MateCompressor = MateCompressor;

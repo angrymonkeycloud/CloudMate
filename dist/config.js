@@ -3,7 +3,7 @@ var __extends = (this && this.__extends) || (function () {
     var extendStatics = function (d, b) {
         extendStatics = Object.setPrototypeOf ||
             ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
         return extendStatics(d, b);
     };
     return function (d, b) {
@@ -13,6 +13,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MateConfigFormatterConfig = exports.MateConfigJSConfig = exports.MateConfigCSSConfig = exports.MateConfigBaseConfig = exports.MateConfigBuild = exports.MateConfigImage = exports.MateConfigFile = exports.MateConfig = void 0;
 var fs = require("fs");
 var glob = require("glob");
 var cosmiconfig_1 = require("cosmiconfig");
@@ -63,7 +64,7 @@ var MateConfig = (function () {
             });
             return this._configurationExplorer;
         },
-        enumerable: true,
+        enumerable: false,
         configurable: true
     });
     Object.defineProperty(MateConfig, "availableConfigurationFile", {
@@ -77,7 +78,7 @@ var MateConfig = (function () {
                 throw new Error('Configuration file was not found.');
             }
         },
-        enumerable: true,
+        enumerable: false,
         configurable: true
     });
     MateConfig.get = function () {

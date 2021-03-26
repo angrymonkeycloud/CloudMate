@@ -10,9 +10,17 @@ import gifsicle = require('imagemin-gifsicle');
 import glob = require('glob');
 import del = require('del');
 
+
+class ImageQueue {
+	public filePath: string;
+	public destination: string;
+	public plugins: any[];
+}
+
 export class MateCompressor {
 	static allWatchers: chokidar.FSWatcher[] = [];
-
+	static queue: ImageQueue[] = [];
+	static compressionInProgress = false;
 	static watch(config: MateConfig) {
 
 		if (config.images === undefined)
@@ -28,8 +36,14 @@ export class MateCompressor {
 
 			const watch = chokidar.watch(watchPaths, { persistent: true })
 				.on('unlink', (filePath) => { this.delete(file, filePath); })
-				.on('add', () => { this.compress(file); })
-				.on('change', () => { this.compress(file, true); });
+				.on('add', () => {
+					this.queueImages(file);
+					MateCompressor.compressImages();
+				})
+				.on('change', () => {
+					this.queueImages(file, true);
+					MateCompressor.compressImages();
+				});
 
 			this.allWatchers.push(watch);
 		});
@@ -43,8 +57,10 @@ export class MateCompressor {
 			return;
 
 		config.images.forEach((image): void => {
-			MateCompressor.compress(image);
+			MateCompressor.queueImages(image);
 		});
+
+		MateCompressor.compressImages();
 	}
 
 	private static isFile(filePath: string): boolean {
@@ -55,7 +71,7 @@ export class MateCompressor {
 		return fs.statSync(filePath).isFile();
 	}
 
-	static async compress(image: MateConfigImage, override: boolean = false) {
+	static async queueImages(image: MateConfigImage, override: boolean = false) {
 
 		for (const output of image.output)
 			for (const input of image.input) {
@@ -63,6 +79,9 @@ export class MateCompressor {
 				const baseDirectory = !this.isFile(input) ? path.dirname(input) : null;
 
 				glob.sync(input, { nodir: true }).forEach(async (file) => {
+
+					if (MateCompressor.queue.map(obj => obj.filePath).indexOf(file) !== -1)
+						return;
 
 					const fileExtention = file.split('.').pop().toLowerCase();
 
@@ -108,14 +127,44 @@ export class MateCompressor {
 							doCompress = false;
 					}
 
-					if (doCompress)
-						await imagemin([file], {
-							destination: destination,
-							plugins: plugins,
-							glob: false
-						});
+					if (doCompress) {
+						const image = new ImageQueue();
+						image.filePath = file;
+						image.destination = destination;
+						image.plugins = plugins;
+						MateCompressor.queue.push(image);
+					}
 				})
 			}
+	}
+
+	static compressImages(isContinuous = false) {
+
+		if (MateCompressor.queue.length == 0) {
+			MateCompressor.compressionInProgress = false;
+			return;
+		}
+
+		if (!isContinuous && MateCompressor.compressionInProgress)
+			return;
+
+		MateCompressor.compressionInProgress = true;
+
+		const image = MateCompressor.queue.shift();
+
+		const result = imagemin([image.filePath], {
+			destination: image.destination,
+			plugins: image.plugins,
+			glob: false
+		});
+
+		result.then((e) => {
+			MateCompressor.compressImages(true);
+		});
+
+		result.catch((e) => {
+			MateCompressor.compressImages(true);
+		});
 	}
 
 	static async delete(image: MateConfigImage, filePath: string) {
