@@ -80,6 +80,9 @@ export class MateCompressor {
 
 				glob.sync(input, { nodir: true }).forEach(async (file) => {
 
+					if (MateCompressor.queue.map(obj => obj.filePath).indexOf(file) !== -1)
+						return;
+
 					const fileExtention = file.split('.').pop().toLowerCase();
 
 					const plugins = [];
@@ -124,48 +127,30 @@ export class MateCompressor {
 							doCompress = false;
 					}
 
-
 					if (doCompress) {
-						let alreadyQueued = false;
-
-						MateCompressor.queue.forEach(element => {
-							if(element.filePath == file){
-								alreadyQueued = true;
-								return;
-							}
-						});
-
-						if(!alreadyQueued){
-							const image = new ImageQueue();
-							image.filePath = file;
-							image.destination = destination;
-							image.plugins = plugins;
-							MateCompressor.queue.push(image);
-						}
-						
+						const image = new ImageQueue();
+						image.filePath = file;
+						image.destination = destination;
+						image.plugins = plugins;
+						MateCompressor.queue.push(image);
 					}
 				})
 			}
 	}
 
-	static compressImages() {
+	static compressImages(isContinuous = false) {
 
-		if (MateCompressor.queue.length == 0)
-		{
+		if (MateCompressor.queue.length == 0) {
 			MateCompressor.compressionInProgress = false;
 			return;
 		}
 
-		if (MateCompressor.compressionInProgress)
+		if (!isContinuous && MateCompressor.compressionInProgress)
 			return;
 
 		MateCompressor.compressionInProgress = true;
 
 		const image = MateCompressor.queue.shift();
-		var date = new Date();
-		var time = date.getHours() + ":" + date.getSeconds();
-
-		console.log("start: " + image.filePath + " @ " + time);
 
 		const result = imagemin([image.filePath], {
 			destination: image.destination,
@@ -174,16 +159,11 @@ export class MateCompressor {
 		});
 
 		result.then((e) => {
-			date = new Date();
-			time = date.getHours() + ":" + date.getSeconds();
-			console.log("end: " + image.filePath + " @ " + time);
-			console.log("------------------");
-			MateCompressor.compressImages();
+			MateCompressor.compressImages(true);
 		});
 
 		result.catch((e) => {
-			console.log(e);
-			MateCompressor.compressImages();
+			MateCompressor.compressImages(true);
 		});
 	}
 
