@@ -3,7 +3,7 @@ import { MateConfig, MateConfigFile, MateConfigBuild } from './config';
 import chokidar = require('chokidar');
 const gulp = require('gulp');
 const gulpLess = require('gulp-less');
-const gulpSass = require('gulp-sass');
+const gulpSass = require('gulp-sass')(require('sass'));
 const gulpRename = require('gulp-rename');
 const gulpConcat = require('gulp-concat');
 const gulpTs = require('gulp-typescript');
