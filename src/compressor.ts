@@ -4,17 +4,17 @@ import { MateConfig, MateConfigImage } from './config';
 import chokidar = require('chokidar');
 import imagemin = require('imagemin');
 import svgo = require('imagemin-svgo');
-import mozjpeg = require('imagemin-mozjpeg');
-import optipng = require('imagemin-optipng');
 import gifsicle = require('imagemin-gifsicle');
+import pngquant from 'imagemin-pngquant';
+import mozjpeg = require('imagemin-mozjpeg');
 import glob = require('glob');
 import del = require('del');
-
 
 class ImageQueue {
 	public filePath: string;
 	public destination: string;
 	public plugins: any[];
+	public oldSize:number;
 }
 
 export class MateCompressor {
@@ -72,10 +72,10 @@ export class MateCompressor {
 	}
 
 	static async queueImages(image: MateConfigImage, override: boolean = false) {
-
+			
 		for (const output of image.output)
 			for (const input of image.input) {
-
+				
 				const baseDirectory = !this.isFile(input) ? path.dirname(input) : null;
 
 				glob.sync(input, { nodir: true }).forEach(async (file) => {
@@ -86,7 +86,7 @@ export class MateCompressor {
 					const fileExtention = file.split('.').pop().toLowerCase();
 
 					const plugins = [];
-
+					
 					switch (fileExtention) {
 
 						case "svg":
@@ -94,7 +94,9 @@ export class MateCompressor {
 							break;
 
 						case "png":
-							plugins.push(optipng());
+							plugins.push(pngquant({
+								quality:[0.6,0.8]
+							}));
 							break;
 
 						case "jpeg":
@@ -132,6 +134,7 @@ export class MateCompressor {
 						image.filePath = file;
 						image.destination = destination;
 						image.plugins = plugins;
+						image.oldSize = fs.readFileSync(file).byteLength;
 						MateCompressor.queue.push(image);
 					}
 				})
@@ -159,6 +162,14 @@ export class MateCompressor {
 		});
 
 		result.then((e) => {
+			const destinationPath=image.destination + '/' + image.filePath.split('/').pop();
+            const newZise = fs.readFileSync(destinationPath).byteLength;
+			
+			if(newZise > image.oldSize )
+				fs.copyFile(image.filePath,destinationPath, (err) => {
+					if (err) throw err;
+				});
+			
 			MateCompressor.compressImages(true);
 		});
 
