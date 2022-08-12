@@ -42,9 +42,9 @@ var path = require("path");
 var chokidar = require("chokidar");
 var imagemin = require("imagemin");
 var svgo = require("imagemin-svgo");
-var mozjpeg = require("imagemin-mozjpeg");
-var optipng = require("imagemin-optipng");
 var gifsicle = require("imagemin-gifsicle");
+var imagemin_pngquant_1 = require("imagemin-pngquant");
+var mozjpeg = require("imagemin-mozjpeg");
 var glob = require("glob");
 var del = require("del");
 var ImageQueue = (function () {
@@ -112,7 +112,9 @@ var MateCompressor = (function () {
                                         plugins.push(svgo());
                                         break;
                                     case "png":
-                                        plugins.push(optipng());
+                                        plugins.push(imagemin_pngquant_1.default({
+                                            quality: [0.6, 0.8]
+                                        }));
                                         break;
                                     case "jpeg":
                                     case "jpg":
@@ -140,6 +142,7 @@ var MateCompressor = (function () {
                                     image_1.filePath = file;
                                     image_1.destination = destination;
                                     image_1.plugins = plugins;
+                                    image_1.oldSize = fs.readFileSync(file).byteLength;
                                     MateCompressor.queue.push(image_1);
                                 }
                                 return [2];
@@ -176,6 +179,13 @@ var MateCompressor = (function () {
             glob: false
         });
         result.then(function (e) {
+            var destinationPath = image.destination + '/' + image.filePath.split('/').pop();
+            var newZise = fs.readFileSync(destinationPath).byteLength;
+            if (newZise > image.oldSize)
+                fs.copyFile(image.filePath, destinationPath, function (err) {
+                    if (err)
+                        throw err;
+                });
             MateCompressor.compressImages(true);
         });
         result.catch(function (e) {
