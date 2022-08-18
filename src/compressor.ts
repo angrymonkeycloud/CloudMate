@@ -2,19 +2,22 @@ import fs = require('fs');
 import path = require('path');
 import { MateConfig, MateConfigImage } from './config';
 import chokidar = require('chokidar');
-import imagemin = require('imagemin');
-import svgo = require('imagemin-svgo');
+import imagemin from 'imagemin';
+import svgo from 'imagemin-svgo';
 import gifsicle = require('imagemin-gifsicle');
 import pngquant from 'imagemin-pngquant';
 import mozjpeg = require('imagemin-mozjpeg');
 import glob = require('glob');
 import del = require('del');
+import sharp from 'sharp';
+import imageminSharp from 'imagemin-sharp';
 
 class ImageQueue {
 	public filePath: string;
 	public destination: string;
 	public plugins: any[];
-	public oldSize:number;
+	public oldSize: number;
+	public Config: MateConfigImage;
 }
 
 export class MateCompressor {
@@ -71,11 +74,11 @@ export class MateCompressor {
 		return fs.statSync(filePath).isFile();
 	}
 
-	static async queueImages(image: MateConfigImage, override: boolean = false) {
-			
-		for (const output of image.output)
-			for (const input of image.input) {
-				
+	static async queueImages(imageConfig: MateConfigImage, override: boolean = false) {
+
+		for (const output of imageConfig.output)
+			for (const input of imageConfig.input) {
+
 				const baseDirectory = !this.isFile(input) ? path.dirname(input) : null;
 
 				glob.sync(input, { nodir: true }).forEach(async (file) => {
@@ -83,10 +86,63 @@ export class MateCompressor {
 					if (MateCompressor.queue.map(obj => obj.filePath).indexOf(file) !== -1)
 						return;
 
-					const fileExtention = file.split('.').pop().toLowerCase();
+					let fileExtention = file.split('.').pop().toLowerCase();
+
+					let destination = output;
+
+					if (baseDirectory)
+						destination = output + path.dirname(file).substring(baseDirectory.length);
+
+					let runPlugins = true;
+
+					let outputFileName = file.replace(/^.*[\\\/]/, '');
+
+					if (imageConfig.outputFormat)
+						outputFileName = outputFileName.replace(/\.[^/.]+$/, "") + '.' + imageConfig.outputFormat;
+
+					const fileExists = fs.existsSync(destination + '/' + outputFileName)
+
+					if (!override && fileExists)
+						runPlugins = false;
 
 					const plugins = [];
-					
+
+					switch (fileExtention) {
+
+						case "png":
+						case "jpeg":
+						case "jpg":
+						case "gif":
+						case "webp":
+						case "avif":
+						case "tiff":
+							plugins.push(imageminSharp({
+
+								chainSharp: async (originalImage) => {
+
+									let sharpResult = originalImage;
+
+									sharpResult = originalImage
+										.resize(
+											imageConfig.maxWidth, imageConfig.maxHeight,
+											{
+												fit: 'inside',
+												withoutEnlargement: true
+											});
+
+									if (imageConfig.outputFormat) {
+										fileExtention = imageConfig.outputFormat.toLowerCase();
+										sharpResult.toFormat(imageConfig.outputFormat);
+									}
+
+									return sharpResult;
+								},
+							}));
+							break;
+
+						default: break;
+					}
+
 					switch (fileExtention) {
 
 						case "svg":
@@ -95,7 +151,7 @@ export class MateCompressor {
 
 						case "png":
 							plugins.push(pngquant({
-								quality:[0.6,0.8]
+								quality: [0.6, 0.8]
 							}));
 							break;
 
@@ -115,26 +171,13 @@ export class MateCompressor {
 					if (plugins.length === 0)
 						return;
 
-					let destination = output;
-
-					if (baseDirectory)
-						destination = output + path.dirname(file).substring(baseDirectory.length);
-
-					let doCompress = true;
-
-					if (!override) {
-						const outputFileName = file.replace(/^.*[\\\/]/, '');
-
-						if (fs.existsSync(destination + '/' + outputFileName))
-							doCompress = false;
-					}
-
-					if (doCompress) {
+					if (runPlugins) {
 						const image = new ImageQueue();
 						image.filePath = file;
 						image.destination = destination;
 						image.plugins = plugins;
 						image.oldSize = fs.readFileSync(file).byteLength;
+						image.Config = imageConfig;
 						MateCompressor.queue.push(image);
 					}
 				})
@@ -162,14 +205,17 @@ export class MateCompressor {
 		});
 
 		result.then((e) => {
-			const destinationPath=image.destination + '/' + image.filePath.split('/').pop();
-            const newZise = fs.readFileSync(destinationPath).byteLength;
-			
-			if(newZise > image.oldSize )
-				fs.copyFile(image.filePath,destinationPath, (err) => {
-					if (err) throw err;
-				});
-			
+
+			if (!image.Config.outputFormat) {
+				const destinationPath = image.destination + '/' + image.filePath.split('/').pop();
+				const newZise = fs.readFileSync(destinationPath).byteLength;
+
+				if (newZise > image.oldSize)
+					fs.copyFile(image.filePath, destinationPath, (err) => {
+						if (err) throw err;
+					});
+			}
+
 			MateCompressor.compressImages(true);
 		});
 

@@ -3,6 +3,7 @@
         "noImplicitAny": false,
         "noEmitOnError": false,
         "removeComments": true,
+        "esModuleInterop": true,
         "target": "ES5"
     }
 }

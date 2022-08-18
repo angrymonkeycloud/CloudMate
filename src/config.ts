@@ -195,6 +195,9 @@ export class MateConfigFile {
 export class MateConfigImage {
 	input: string[];
 	output: string[];
+	maxWidth?: number;
+	maxHeight?: number;
+	outputFormat?: string;
 }
 
 export class MateConfigBuild {

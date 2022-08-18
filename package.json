@@ -11,7 +11,10 @@
     },
     "author": "Angry Monkey Cloud",
     "license": "POST License",
-    "devDependencies": {},
+    "devDependencies": {
+        "@types/imagemin": "^8.0.0",
+        "@types/imagemin-svgo": "^10.0.1"
+    },
     "dependencies": {
         "chokidar": "3.4.3",
         "cosmiconfig": "7.0.0",
@@ -26,14 +29,16 @@
         "gulp-minify": "3.1.0",
         "gulp-rename": "^2.0.0",
         "gulp-sass": "^5.1.0",
-        "sass": "~1.49.9",
         "gulp-sourcemaps": "3.0.0",
         "gulp-typescript": "^6.0.0-alpha.1",
         "imagemin": "7.0.1",
-        "imagemin-pngquant": "^9.0.2",
-        "imagemin-svgo": "8.0.0",
-        "imagemin-mozjpeg": "^9.0.0",
         "imagemin-gifsicle": "7.0.0",
+        "imagemin-mozjpeg": "^9.0.0",
+        "imagemin-pngquant": "^9.0.2",
+        "imagemin-sharp": "1.0.6",
+        "imagemin-svgo": "8.0.0",
+        "sass": "~1.49.9",
+        "sharp": "0.30.7",
         "typescript": "4.7.4"
     }
 }

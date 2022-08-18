@@ -76,7 +76,9 @@
     "images": [
         {
             "output": "devfolder/img",
-            "input": "images/**"
+            "input": "images/**",
+            "maxWidth": 1000,
+            "outputFormat": "webp"
         }
     ]
 }
