@@ -119,17 +119,18 @@ export class MateCompressor {
 
 								chainSharp: async (originalImage) => {
 									let sharpResult = originalImage;
-									const meta=await sharpResult.metadata();
-									sharpResult = await  originalImage
+									const meta = await sharpResult.metadata();
+
+									sharpResult = await originalImage
 										.resize(
 											{
-												width:meta.orientation >=5? imageConfig.maxHeight: imageConfig.maxWidth,
-												height: meta.orientation >=5? imageConfig.maxWidth: imageConfig.maxHeight,
+												width: meta.orientation < 5 ? imageConfig.maxWidth : imageConfig.maxHeight,
+												height: meta.orientation < 5 ? imageConfig.maxHeight : imageConfig.maxWidth,
 												fit: 'inside',
 												withoutEnlargement: true,
 											})
-											.withMetadata();
-										
+										.withMetadata();
+
 									if (imageConfig.outputFormat) {
 										fileExtention = imageConfig.outputFormat.toLowerCase();
 										sharpResult.toFormat(imageConfig.outputFormat);
@@ -139,6 +140,7 @@ export class MateCompressor {
 								},
 							}));
 							break;
+						
 						default: break;
 					}
 

@@ -132,19 +132,30 @@ var MateCompressor = (function () {
                                     case "tiff":
                                         plugins.push((0, imagemin_sharp_1.default)({
                                             chainSharp: function (originalImage) { return __awaiter(_this, void 0, void 0, function () {
-                                                var sharpResult;
+                                                var sharpResult, meta;
                                                 return __generator(this, function (_a) {
-                                                    sharpResult = originalImage;
-                                                    sharpResult = originalImage
-                                                        .resize(imageConfig.maxWidth, imageConfig.maxHeight, {
-                                                        fit: 'inside',
-                                                        withoutEnlargement: true
-                                                    });
-                                                    if (imageConfig.outputFormat) {
-                                                        fileExtention = imageConfig.outputFormat.toLowerCase();
-                                                        sharpResult.toFormat(imageConfig.outputFormat);
+                                                    switch (_a.label) {
+                                                        case 0:
+                                                            sharpResult = originalImage;
+                                                            return [4, sharpResult.metadata()];
+                                                        case 1:
+                                                            meta = _a.sent();
+                                                            return [4, originalImage
+                                                                    .resize({
+                                                                    width: meta.orientation < 5 ? imageConfig.maxWidth : imageConfig.maxHeight,
+                                                                    height: meta.orientation < 5 ? imageConfig.maxHeight : imageConfig.maxWidth,
+                                                                    fit: 'inside',
+                                                                    withoutEnlargement: true,
+                                                                })
+                                                                    .withMetadata()];
+                                                        case 2:
+                                                            sharpResult = _a.sent();
+                                                            if (imageConfig.outputFormat) {
+                                                                fileExtention = imageConfig.outputFormat.toLowerCase();
+                                                                sharpResult.toFormat(imageConfig.outputFormat);
+                                                            }
+                                                            return [2, sharpResult];
                                                     }
-                                                    return [2, sharpResult];
                                                 });
                                             }); },
                                         }));
