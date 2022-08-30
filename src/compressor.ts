@@ -9,7 +9,6 @@ import pngquant from 'imagemin-pngquant';
 import mozjpeg = require('imagemin-mozjpeg');
 import glob = require('glob');
 import del = require('del');
-import sharp from 'sharp';
 import imageminSharp from 'imagemin-sharp';
 
 class ImageQueue {
@@ -119,17 +118,18 @@ export class MateCompressor {
 							plugins.push(imageminSharp({
 
 								chainSharp: async (originalImage) => {
-
 									let sharpResult = originalImage;
-
-									sharpResult = originalImage
+									const meta=await sharpResult.metadata();
+									sharpResult = await  originalImage
 										.resize(
-											imageConfig.maxWidth, imageConfig.maxHeight,
 											{
+												width:meta.orientation >=5? imageConfig.maxHeight: imageConfig.maxWidth,
+												height: meta.orientation >=5? imageConfig.maxWidth: imageConfig.maxHeight,
 												fit: 'inside',
-												withoutEnlargement: true
-											});
-
+												withoutEnlargement: true,
+											})
+											.withMetadata();
+										
 									if (imageConfig.outputFormat) {
 										fileExtention = imageConfig.outputFormat.toLowerCase();
 										sharpResult.toFormat(imageConfig.outputFormat);
@@ -139,7 +139,6 @@ export class MateCompressor {
 								},
 							}));
 							break;
-
 						default: break;
 					}
 
