@@ -24,26 +24,6 @@
 			"output": "test/clean.js"
 		},
 		{
-			"input": "src/bundler.ts",
-			"output": "ts/bundler.ts"
-		},
-		
-		{
-			"input": "src/compressor.ts",
-			"output": "ts/compressor.ts"
-		},
-		
-		{
-			"input": "src/config.ts",
-			"output": "ts/config.ts"
-		},
-		
-		{
-			"input": "src/webcleanjs.ts",
-			"output": "ts/webcleanjs.ts"
-		},
-		
-		{
 			"input": "src/config.ts",
 			"output": "test/config.js",
 			"builds": [
@@ -80,6 +60,34 @@
 			"output": "test/webcleanjs.js",
 			"builds": [
 				"dev",
+				"dist"
+			]
+		},
+		{
+			"input": "src/bundler.ts",
+			"output": "ts/bundler.ts",
+			"builds": [
+				"dist"
+			]
+		},
+		{
+			"input": "src/compressor.ts",
+			"output": "ts/compressor.ts",
+			"builds": [
+				"dist"
+			]
+		},
+		{
+			"input": "src/config.ts",
+			"output": "ts/config.ts",
+			"builds": [
+				"dist"
+			]
+		},
+		{
+			"input": "src/webcleanjs.ts",
+			"output": "ts/webcleanjs.ts",
+			"builds": [
 				"dist"
 			]
 		}
