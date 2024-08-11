@@ -13,6 +13,7 @@ public class Project
 
     public string Name { get; init; }
     public string FilePath => $"../../../../{Name}/{Name}.csproj";
+    public bool UpdateVersion{ get; init; } = true;
     public bool UpdateMetadata { get; init; } = true;
     public bool PackAndPublish { get; init; } = true;
 

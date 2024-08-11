@@ -72,17 +72,21 @@ public class CloudMate(CloudMateConfig config)
             StartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"pack {project.FilePath} -c Release -o ./nupkgs  -nowarn",
+                Arguments = $"pack {project.FilePath} -c Release -o ./nupkgs -clp:ErrorsOnly",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                Verb = "runas"
             }
         };
 
-        process.Start();
+        using (FileStream fs = new(project.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            process.Start();
+        }
 
-        int timeout = 30000; // 60 seconds
+        int timeout = 30000; // 30 seconds
         bool exited = await Task.Run(() => process.WaitForExit(timeout));
 
         if (!exited)
@@ -209,6 +213,12 @@ public class CloudMate(CloudMateConfig config)
         Project sourceProject = new("CloudLogin.Nuget");
 
         Version = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/Version") ?? throw new Exception("Could not get version from source");
+
+        foreach(Project project in Projects.Where(key => key.UpdateVersion))
+        {
+            UpdateProjectNode(project, "PropertyGroup/Version", Version);
+            await UpdateProjectMetadata(project);
+        }
 
         LogHeading("Update Matadata all started");
 
