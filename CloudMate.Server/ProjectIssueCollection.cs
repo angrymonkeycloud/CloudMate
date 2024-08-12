@@ -37,7 +37,13 @@ internal class ProjectIssueCollection
     {
         ProjectIssue? p = Projects.FirstOrDefault(key => key.Project.Name.Equals(project.Name));
 
-        return p ??= new(project);
+        if (p == null)
+        {
+            p = new(project);
+            Projects.Add(p);
+        }
+
+        return p;
     }
 
     internal bool HasIssues => Projects.Count > 0;
