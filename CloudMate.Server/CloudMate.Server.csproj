@@ -4,6 +4,24 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>AngryMonkey.CloudMate</AssemblyName>
+    <RootNamespace>AngryMonkey.CloudMate</RootNamespace>
+    <Authors>Angry Monkey</Authors>
+    <Company>Angry Monkey</Company>
+    <Version>1.0.0-beta02</Version>
+    <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
+    <FileVersion>$(PackageVersion)</FileVersion>
+    <PackageIcon>AngryMonkeyCloudLogo-64x64.png</PackageIcon>
+    <UserSecretsId>9d2adc67-bf55-4756-816f-6279d9a3b594</UserSecretsId>
+    <PackageOutputPath>../../../../../NugetPackages</PackageOutputPath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="AngryMonkeyCloudLogo-64x64.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
