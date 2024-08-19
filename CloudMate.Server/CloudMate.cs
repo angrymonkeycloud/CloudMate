@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Xml.Linq;
 using System.Xml;
+using System.Reflection;
 
 namespace AngryMonkey.CloudMate;
 
@@ -11,7 +12,7 @@ public class CloudMate(CloudMateConfig config)
     public string[] MetadataProperies { get; set; } = [];
     public Project[] Projects { get; set; } = [];
 
-    private string Version { get; set; } = string.Empty;
+    private string? Version { get; set; }
 
     readonly ProjectIssueCollection Issues = new();
 
@@ -102,7 +103,8 @@ public class CloudMate(CloudMateConfig config)
 
         if (!succeeded)
         {
-            string[] files = Directory.GetFiles("./nupkgs", $"{project.AssemblyName}.{Version}.nupkg");
+            string version = GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? throw new Exception("Version is missing");
+            string[] files = Directory.GetFiles("./nupkgs", $"{project.AssemblyName}.{version}.nupkg");
             succeeded = files.Length > 0;
         }
 
@@ -121,12 +123,14 @@ public class CloudMate(CloudMateConfig config)
         if (string.IsNullOrEmpty(Config.NugetApiKey))
             throw new ArgumentNullException(nameof(Config.NugetApiKey));
 
+        string version = GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? throw new Exception("Version is missing");
+
         Process process = new()
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"nuget push ./nupkgs/{project.AssemblyName}.{Version}.nupkg --skip-duplicate -k {Config.NugetApiKey} -s https://api.nuget.org/v3/index.json",
+                Arguments = $"nuget push ./nupkgs/{project.AssemblyName}.{version}.nupkg --skip-duplicate -k {Config.NugetApiKey} -s https://api.nuget.org/v3/index.json",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -210,12 +214,26 @@ public class CloudMate(CloudMateConfig config)
 
     public async Task Pack()
     {
-        Project sourceProject = new("CloudLogin.Nuget");
+        string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        string projectDirectory = Directory.GetParent(currentDirectory).FullName;
+        string? projectFileName = null;
 
-        Version = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/Version") ?? throw new Exception("Could not get version from source");
-
-        foreach(Project project in Projects.Where(key => key.UpdateVersion))
+        while (projectFileName == null)
         {
+            projectDirectory = Directory.GetParent(projectDirectory).FullName;
+            projectFileName = Directory.GetFiles(projectDirectory, "*.csproj").FirstOrDefault();
+        }
+
+        string projectName = Path.GetFileNameWithoutExtension(projectFileName);
+        Project sourceProject = new(projectName);
+
+        Version = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/Version");
+
+        foreach (Project project in Projects.Where(key => key.UpdateVersion))
+        {
+            if (string.IsNullOrEmpty(Version))
+                throw new Exception("Version is null.");
+
             UpdateProjectNode(project, "PropertyGroup/Version", Version);
             await UpdateProjectMetadata(project);
         }
