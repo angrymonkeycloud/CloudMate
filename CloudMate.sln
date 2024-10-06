@@ -7,24 +7,24 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CloudMate.Package", "CloudMate.Package\CloudMate.Package.csproj", "{0A771811-48FB-4416-9A77-DB20A70B102C}"
 EndProject
 Global
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {AD6EDD8C-96C3-4908-948F-E224DC1B4E2F}
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{0A771811-48FB-4416-9A77-DB20A70B102C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0A771811-48FB-4416-9A77-DB20A70B102C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0A771811-48FB-4416-9A77-DB20A70B102C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0A771811-48FB-4416-9A77-DB20A70B102C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Release|Any CPU.Build.0 = Release|Any CPU
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE10BB64-4506-40FF-8BF9-F4B38EC7E4AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A771811-48FB-4416-9A77-DB20A70B102C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A771811-48FB-4416-9A77-DB20A70B102C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A771811-48FB-4416-9A77-DB20A70B102C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A771811-48FB-4416-9A77-DB20A70B102C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AD6EDD8C-96C3-4908-948F-E224DC1B4E2F}
 	EndGlobalSection
 EndGlobal

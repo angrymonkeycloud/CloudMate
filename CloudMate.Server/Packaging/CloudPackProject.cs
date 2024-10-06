@@ -2,13 +2,13 @@
 
 namespace AngryMonkey.CloudMate;
 
-public class Project
+public class CloudPackProject
 {
-    public Project(string name)
+    public CloudPackProject(string name)
     {
         Name = name;
         Document = XDocument.Load(FilePath, LoadOptions.PreserveWhitespace);
-        AssemblyName = CloudMate.GetProjectPropertyValue(Document, "PropertyGroup/AssemblyName")!;
+        AssemblyName = CloudPack.GetProjectPropertyValue(Document, "PropertyGroup/AssemblyName")!;
     }
 
     public string Name { get; init; }

@@ -1,41 +1,41 @@
 ﻿
 namespace AngryMonkey.CloudMate;
 
-internal class ProjectIssueCollection
+internal class CloudPackIssueCollection
 {
-    readonly public List<ProjectIssue> Projects = [];
+    readonly public List<CloudPackIssue> Projects = [];
 
-    internal void AddMetadataIssue(Project project)
+    internal void AddMetadataIssue(CloudPackProject project)
     {
-        ProjectIssue p = GetProject(project);
+        CloudPackIssue p = GetProject(project);
 
         p.UpdateMetadataIssue = true;
     }
 
-    internal void AddRebuildIssue(Project project)
+    internal void AddRebuildIssue(CloudPackProject project)
     {
-        ProjectIssue p = GetProject(project);
+        CloudPackIssue p = GetProject(project);
 
         p.RebuildIssue = true;
     }
 
-    internal void AddPackingIssue(Project project)
+    internal void AddPackingIssue(CloudPackProject project)
     {
-        ProjectIssue p = GetProject(project);
+        CloudPackIssue p = GetProject(project);
 
         p.PackingIssue = true;
     }
 
-    internal void AddPublishingIssue(Project project)
+    internal void AddPublishingIssue(CloudPackProject project)
     {
-        ProjectIssue p = GetProject(project);
+        CloudPackIssue p = GetProject(project);
 
         p.PublishingIssue = true;
     }
 
-    private ProjectIssue GetProject(Project project)
+    private CloudPackIssue GetProject(CloudPackProject project)
     {
-        ProjectIssue? p = Projects.FirstOrDefault(key => key.Project.Name.Equals(project.Name));
+        CloudPackIssue? p = Projects.FirstOrDefault(key => key.Project.Name.Equals(project.Name));
 
         if (p == null)
         {
@@ -50,7 +50,7 @@ internal class ProjectIssueCollection
 
     internal void LogIssues()
     {
-        foreach (ProjectIssue projectIssue in Projects)
+        foreach (CloudPackIssue projectIssue in Projects)
         {
             List<string> issues = [];
 

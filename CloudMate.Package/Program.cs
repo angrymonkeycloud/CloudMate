@@ -9,10 +9,10 @@ var builder = new ConfigurationBuilder()
 IConfigurationRoot configuration = builder.Build();
 string apiKey = configuration["NuGetApiKey"];
 
-await new CloudMate(new CloudMateConfig() { NugetApiKey = apiKey })
+await new CloudPack(new CloudPackConfig() { NugetApiKey = apiKey })
 {
     Projects =
     [
-        new Project("CloudMate.Server") { UpdateVersion = false, UpdateMetadata = false }
+        new CloudPackProject("CloudMate.Server") { UpdateVersion = false, UpdateMetadata = false }
     ]
 }.Pack();

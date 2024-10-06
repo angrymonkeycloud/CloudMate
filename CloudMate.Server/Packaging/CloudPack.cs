@@ -5,16 +5,16 @@ using System.Reflection;
 
 namespace AngryMonkey.CloudMate;
 
-public class CloudMate(CloudMateConfig config)
+public class CloudPack(CloudPackConfig config)
 {
-    readonly CloudMateConfig Config = config;
+    readonly CloudPackConfig Config = config;
 
     public string[] MetadataProperies { get; set; } = [];
-    public Project[] Projects { get; set; } = [];
+    public CloudPackProject[] Projects { get; set; } = [];
 
     private string? Version { get; set; }
 
-    readonly ProjectIssueCollection Issues = new();
+    readonly CloudPackIssueCollection Issues = new();
 
     internal static string? GetProjectPropertyValue(XDocument doc, string propertyName)
     {
@@ -33,7 +33,7 @@ public class CloudMate(CloudMateConfig config)
         return element.Value;
     }
 
-    internal async Task UpdateProjectMetadata(Project project)
+    internal async Task UpdateProjectMetadata(CloudPackProject project)
     {
         XmlWriterSettings settings = new()
         {
@@ -46,7 +46,7 @@ public class CloudMate(CloudMateConfig config)
         await Task.Run(() => project.Document.Save(writer));
     }
 
-    internal void UpdateProjectNode(Project project, string propertyName, string value)
+    internal void UpdateProjectNode(CloudPackProject project, string propertyName, string value)
     {
         XElement element = project.Document.Root ?? throw new Exception("Project document issue");
 
@@ -66,7 +66,7 @@ public class CloudMate(CloudMateConfig config)
         element.Value = value;
     }
 
-    internal async Task PackProject(Project project)
+    internal async Task PackProject(CloudPackProject project)
     {
         Process process = new()
         {
@@ -118,7 +118,7 @@ public class CloudMate(CloudMateConfig config)
         }
     }
 
-    internal async Task PublishPackage(Project project)
+    internal async Task PublishPackage(CloudPackProject project)
     {
         if (string.IsNullOrEmpty(Config.NugetApiKey))
             throw new ArgumentNullException(nameof(Config.NugetApiKey));
@@ -157,7 +157,7 @@ public class CloudMate(CloudMateConfig config)
         }
     }
 
-    async Task RebuildProject(Project project)
+    async Task RebuildProject(CloudPackProject project)
     {
         // Clean the project
         var cleanProcess = new Process
@@ -225,11 +225,11 @@ public class CloudMate(CloudMateConfig config)
         }
 
         string projectName = Path.GetFileNameWithoutExtension(projectFileName);
-        Project sourceProject = new(projectName);
+        CloudPackProject sourceProject = new(projectName);
 
         Version = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/Version");
 
-        foreach (Project project in Projects.Where(key => key.UpdateVersion))
+        foreach (CloudPackProject project in Projects.Where(key => key.UpdateVersion))
         {
             if (string.IsNullOrEmpty(Version))
                 throw new Exception("Version is null.");
@@ -246,7 +246,7 @@ public class CloudMate(CloudMateConfig config)
         {
             string value = GetProjectPropertyValue(sourceProject.Document, metadata) ?? throw new Exception("Metadata not foud at source");
 
-            foreach (Project project in Projects.Where(key => key.UpdateMetadata))
+            foreach (CloudPackProject project in Projects.Where(key => key.UpdateMetadata))
             {
                 UpdateProjectNode(project, metadata, value);
                 await UpdateProjectMetadata(project);
@@ -273,7 +273,7 @@ public class CloudMate(CloudMateConfig config)
 
         List<Task> packingTasks = [];
 
-        foreach (Project project in Projects.Where(key => key.PackAndPublish))
+        foreach (CloudPackProject project in Projects.Where(key => key.PackAndPublish))
             packingTasks.Add(PackProject(project));
 
         await Task.WhenAll(packingTasks);
@@ -290,7 +290,7 @@ public class CloudMate(CloudMateConfig config)
 
         // Publish
 
-        foreach (Project project in Projects.Where(key => key.PackAndPublish))
+        foreach (CloudPackProject project in Projects.Where(key => key.PackAndPublish))
         {
             await PublishPackage(project);
         }
@@ -308,7 +308,7 @@ public class CloudMate(CloudMateConfig config)
     }
 }
 
-public class CloudMateConfig
+public class CloudPackConfig
 {
     public string? NugetApiKey { get; set; }
 }
