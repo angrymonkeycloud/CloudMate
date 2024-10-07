@@ -25,6 +25,10 @@ public partial class CloudCode
         sb.AppendLine(string.Empty); // New line
 
         sb.AppendLine(" <PropertyGroup>");
+
+        if (config.SDK == ProjectSDKs.Executable)
+            sb.AppendLine("<OutputType>Exe</OutputType>");
+
         sb.AppendLine($"     <TargetFramework>{config.TargetFramework}</TargetFramework>");
         sb.AppendLine("     <ImplicitUsings>enable</ImplicitUsings>");
         sb.AppendLine("     <Nullable>enable</Nullable>");
@@ -53,7 +57,7 @@ public partial class CloudCode
             sb.AppendLine("  <ItemGroup>");
 
             foreach (ProjectReference project in config.Projects)
-                sb.AppendLine($"    <PackageReference Include=\"{project.Name}\" />");
+                sb.AppendLine($"    <ProjectReference Include=\"{project.Name}\" />");
 
             sb.AppendLine("  </ItemGroup>");
         }
