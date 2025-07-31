@@ -25,47 +25,74 @@ public partial class CloudCode
 
         sb.AppendLine(string.Empty); // New line
 
-        sb.AppendLine(" <PropertyGroup>");
+        sb.AppendLine("\t<PropertyGroup>");
 
         if (config.SDK == ProjectSDKs.Executable)
             sb.AppendLine("<OutputType>Exe</OutputType>");
 
-        sb.AppendLine($"     <TargetFramework>{config.TargetFramework}</TargetFramework>");
-        sb.AppendLine("     <ImplicitUsings>enable</ImplicitUsings>");
-        sb.AppendLine("     <Nullable>enable</Nullable>");
-        sb.AppendLine(" </PropertyGroup>");
+        sb.AppendLine($"\t\t<TargetFramework>{config.TargetFramework}</TargetFramework>");
+        sb.AppendLine("\t\t<ImplicitUsings>enable</ImplicitUsings>");
+        sb.AppendLine("\t\t<Nullable>enable</Nullable>");
+        sb.AppendLine("\t</PropertyGroup>");
 
-        // NuGet Packages
+        List<ProjectPackageReference> packages = [.. config.References.OfType<ProjectPackageReference>()];
+        List<ProjectLocalReference> locals = [.. config.References.OfType<ProjectLocalReference>()];
 
-        if (config.Packages.Count != 0)
-        {
-            sb.AppendLine(string.Empty); // New line
+        // NuGet Package References
+        if (packages.Count != 0)
+            sb.AppendLine(GenerateReferences(packages));
 
-            sb.AppendLine("  <ItemGroup>");
+        // Local References
+        if (locals.Count != 0)
+            sb.AppendLine(GenerateReferences(locals));
 
-            foreach (ProjectPackageReference package in config.Packages)
-                sb.AppendLine($"    <PackageReference Include=\"{package.Name}\" Version=\"{package.Version}\" />");
+        sb.AppendLine("</Project>");
 
-            sb.AppendLine("  </ItemGroup>");
-        }
+        return sb.ToString();
+    }
 
-        // Non NuGet Packages
-
-        if (config.Projects.Count != 0)
-        {
-            sb.AppendLine(string.Empty); // New line
-
-            sb.AppendLine("  <ItemGroup>");
-
-            foreach (ProjectReference project in config.Projects)
-                sb.AppendLine($"    <ProjectReference Include=\"{project.Name}\" />");
-
-            sb.AppendLine("  </ItemGroup>");
-        }
+    private static string GenerateReferences(IEnumerable<ProjectReference> references)
+    {
+        StringBuilder sb = new();
 
         sb.AppendLine(string.Empty); // New line
 
-        sb.AppendLine("</Project>");
+        sb.AppendLine("\t<ItemGroup>");
+
+        foreach (ProjectReference reference in references)
+            sb.Append(GenerateReference(reference));
+
+        sb.AppendLine("\t</ItemGroup>");
+
+        return sb.ToString();
+    }
+
+    private static string GenerateReference(ProjectReference reference)
+    {
+        StringBuilder sb = new();
+
+        ProjectPackageReference? package = reference as ProjectPackageReference;
+
+        List<string> attributes = [$"Include=\"{reference.Name}\""];
+
+        if (package != null)
+            attributes.Add($"Version=\"{package.Version}\"");
+
+        if (reference.PrivateAssets is not null)
+            attributes.Add($"PrivateAssets=\"{reference.PrivateAssets}\"");
+
+        string? attributesString = attributes.Count > 0 ? $"{string.Join(" ", attributes)}" : null;
+
+        string tagName = package != null ? "PackageReference" : "ProjectReference";
+
+        sb.AppendLine($"\t\t<{tagName} {attributesString}{(reference.Pack ? " />" : ">")}");
+
+        if (!reference.Pack)
+        {
+            sb.AppendLine("\t\t\t<Pack>false</Pack>");
+
+            sb.AppendLine($"\t\t</{tagName}>");
+        }
 
         return sb.ToString();
     }

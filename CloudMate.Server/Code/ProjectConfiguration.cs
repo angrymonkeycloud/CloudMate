@@ -8,7 +8,6 @@ public partial class CloudCode
     {
         public ProjectSDKs SDK { get; set; } = ProjectSDKs.SDK;
         public string TargetFramework { get; set; } = "net8.0";
-        public List<ProjectPackageReference> Packages { get; set; } = [];
-        public List<ProjectReference> Projects { get; set; } = [];
+        public List<ProjectReference> References { get; set; } = [];
     }
 }

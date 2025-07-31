@@ -8,7 +8,7 @@
     <RootNamespace>AngryMonkey.CloudMate</RootNamespace>
     <Authors>Angry Monkey</Authors>
     <Company>Angry Monkey</Company>
-    <Version>1.2.1</Version>
+    <Version>1.2.4</Version>
     <AssemblyVersion>$(PackageVersion)</AssemblyVersion>
     <FileVersion>$(PackageVersion)</FileVersion>
     <PackageIcon>AngryMonkeyCloudLogo-64x64.png</PackageIcon>
