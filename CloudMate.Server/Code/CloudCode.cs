@@ -13,6 +13,7 @@ public partial class CloudCode
         ProjectSDKs.Web => "Microsoft.NET.Sdk.Web",
         ProjectSDKs.Razor => "Microsoft.NET.Sdk.Razor",
         ProjectSDKs.Worker => "Microsoft.NET.Sdk.Worker",
+        ProjectSDKs.BlazorWebAssembly => "Microsoft.NET.Sdk.BlazorWebAssembly",
         _ => "Microsoft.NET.Sdk",
     };
 

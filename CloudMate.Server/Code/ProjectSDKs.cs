@@ -8,6 +8,7 @@ public partial class CloudCode
         Executable,
         Web,
         Worker,
-        Razor
+        Razor,
+        BlazorWebAssembly
     }
 }
