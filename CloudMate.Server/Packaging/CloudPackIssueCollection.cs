@@ -1,5 +1,4 @@
-﻿
-namespace AngryMonkey.CloudMate;
+﻿namespace AngryMonkey.CloudMate;
 
 internal class CloudPackIssueCollection
 {
@@ -50,6 +49,9 @@ internal class CloudPackIssueCollection
 
     internal void LogIssues()
     {
+        Console.WriteLine("Issues encountered:");
+        Console.WriteLine(new string('-', 50));
+        
         foreach (CloudPackIssue projectIssue in Projects)
         {
             List<string> issues = [];
@@ -66,7 +68,9 @@ internal class CloudPackIssueCollection
             if (projectIssue.PublishingIssue)
                 issues.Add("Publishing Issue");
 
-            Console.WriteLine($"{projectIssue.Project.Name} | {string.Join(", ", issues)}");
+            Console.WriteLine($"  {projectIssue.Project.Name}: {string.Join(", ", issues)}");
         }
+        
+        Console.WriteLine(new string('-', 50));
     }
 }
