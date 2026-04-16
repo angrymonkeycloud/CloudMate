@@ -5,8 +5,10 @@ namespace AngryMonkey.CloudMate;
 internal class ModernConsoleLogger
 {
     private readonly List<ProjectStatus> _projects = [];
+    private readonly List<string> _errors = [];
     private int _headerLines = 0;
     private bool _isInitialized = false;
+    private int _logLineOffset = 0;
     
     public enum Status
     {
@@ -32,6 +34,8 @@ internal class ModernConsoleLogger
     public void Initialize(IEnumerable<CloudPackProject> projects)
     {
         _projects.Clear();
+        _errors.Clear();
+        _logLineOffset = 0;
         foreach (var project in projects)
         {
             _projects.Add(new ProjectStatus { Name = project.Name });
@@ -189,95 +193,53 @@ internal class ModernConsoleLogger
         DrawProjectTable();
     }
 
+    private int LogAreaStart => _headerLines + _projects.Count + 4;
+
+    private void WriteLogLine(string message, ConsoleColor? color = null)
+    {
+        if (!_isInitialized)
+        {
+            if (color.HasValue) Console.ForegroundColor = color.Value;
+            Console.WriteLine(message);
+            if (color.HasValue) Console.ResetColor();
+            return;
+        }
+
+        Console.SetCursorPosition(0, LogAreaStart + _logLineOffset);
+        Console.Write(new string(' ', Console.WindowWidth - 1));
+        Console.SetCursorPosition(0, LogAreaStart + _logLineOffset);
+
+        if (color.HasValue) Console.ForegroundColor = color.Value;
+        Console.WriteLine(message);
+        if (color.HasValue) Console.ResetColor();
+
+        _logLineOffset++;
+    }
+
     public void LogHeading(string heading)
     {
-        if (!_isInitialized)
-        {
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"📦 {heading}");
-            Console.ResetColor();
-            Console.WriteLine();
-            return;
-        }
-
-        // Move cursor below the table
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 4);
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"📦 {heading}");
-        Console.ResetColor();
+        WriteLogLine($"\n📦 {heading}", ConsoleColor.Cyan);
+        _logLineOffset++; // account for the \n
     }
 
-    public void LogInfo(string message)
-    {
-        if (!_isInitialized)
-        {
-            Console.WriteLine($"ℹ️  {message}");
-            return;
-        }
+    public void LogInfo(string message) => WriteLogLine($"ℹ️  {message}");
 
-        // Move cursor below the table
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 5);
-        Console.WriteLine($"ℹ️  {message}");
-    }
-
-    public void LogWarning(string message)
-    {
-        if (!_isInitialized)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"⚠️  {message}");
-            Console.ResetColor();
-            return;
-        }
-
-        // Move cursor below the table
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 5);
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"⚠️  {message}");
-        Console.ResetColor();
-    }
+    public void LogWarning(string message) => WriteLogLine($"⚠️  {message}", ConsoleColor.Yellow);
 
     public void LogError(string message)
     {
-        if (!_isInitialized)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ {message}");
-            Console.ResetColor();
-            return;
-        }
-
-        // Move cursor below the table
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 5);
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"❌ {message}");
-        Console.ResetColor();
+        _errors.Add(message);
+        WriteLogLine($"❌ {message}", ConsoleColor.Red);
     }
 
-    public void LogSuccess(string message)
-    {
-        if (!_isInitialized)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"✅ {message}");
-            Console.ResetColor();
-            return;
-        }
-
-        // Move cursor below the table
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 5);
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✅ {message}");
-        Console.ResetColor();
-    }
+    public void LogSuccess(string message) => WriteLogLine($"✅ {message}", ConsoleColor.Green);
 
     public void Complete()
     {
         if (!_isInitialized) return;
 
-        // Move cursor below the table for final messages
-        Console.SetCursorPosition(0, _headerLines + _projects.Count + 6);
+        // Move cursor below all accumulated log lines
+        Console.SetCursorPosition(0, LogAreaStart + _logLineOffset + 1);
         
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(new string('═', 95));
@@ -308,6 +270,21 @@ internal class ModernConsoleLogger
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"❌ {failed} project(s) failed");
             Console.ResetColor();
+        }
+
+        if (_errors.Count > 0)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Errors:");
+            Console.ResetColor();
+
+            foreach (string error in _errors)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  - {error}");
+                Console.ResetColor();
+            }
         }
 
         Console.WriteLine();

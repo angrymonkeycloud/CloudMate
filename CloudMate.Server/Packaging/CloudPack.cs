@@ -19,6 +19,37 @@ public class CloudPack(CloudPackConfig config)
 
     readonly CloudPackIssueCollection Issues = new();
 
+    private static List<string> ExtractErrors(string output, string error)
+    {
+        string combined = output + "\n" + error;
+
+        // Collect all MSBuild error lines (e.g., "error NETSDK1..." or "error NU...")
+        List<string> errors = combined
+            .Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Contains(": error ", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (errors.Count > 0)
+            return errors;
+
+        // Fall back to all non-empty lines from stderr
+        errors = error.Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .ToList();
+
+        if (errors.Count > 0)
+            return errors;
+
+        // Fall back to first non-empty line from stdout
+        string? outputLine = output.Split('\n').FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim();
+        if (!string.IsNullOrWhiteSpace(outputLine))
+            return [outputLine];
+
+        return ["Unknown error"];
+    }
+
     internal static string? GetProjectPropertyValue(XDocument doc, string propertyName)
     {
         XElement element = doc.Root ?? throw new Exception("Project document issue");
@@ -69,14 +100,37 @@ public class CloudPack(CloudPackConfig config)
         element.Value = value;
     }
 
+    internal void EnsurePackageIconItemGroup(CloudPackProject project, string iconFileName)
+    {
+        XElement root = project.Document.Root ?? throw new Exception("Project document issue");
+
+        // Check if a <None Update="iconFileName"> already exists
+        bool exists = root.Elements("ItemGroup")
+            .SelectMany(ig => ig.Elements("None"))
+            .Any(n => (string?)n.Attribute("Update") == iconFileName);
+
+        if (exists)
+            return;
+
+        XElement itemGroup = new("ItemGroup",
+            new XElement("None",
+                new XAttribute("Update", iconFileName),
+                new XElement("Pack", "True"),
+                new XElement("PackagePath", @"\")
+            )
+        );
+
+        root.Add(itemGroup);
+    }
+
     internal async Task<bool> PackProject(CloudPackProject project)
     {
         const int maxAttempts = 3;
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress, 
-                attempt, maxAttempts, $"Packing... (attempt {attempt}/{maxAttempts})");
+            _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress,
+                attempt, maxAttempts, "Packing...");
             
             try
             {
@@ -85,7 +139,7 @@ public class CloudPack(CloudPackConfig config)
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "dotnet",
-                        Arguments = $"pack \"{project.FilePath}\" -c Release -o ./nupkgs --nologo --verbosity quiet",
+                        Arguments = $"pack \"{project.FilePath}\" -c Release -o ./nupkgs --nologo --verbosity minimal",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -98,6 +152,10 @@ public class CloudPack(CloudPackConfig config)
                 Directory.CreateDirectory("./nupkgs");
 
                 process.Start();
+
+                // Read stdout/stderr concurrently to avoid deadlock on full output buffers
+                Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                Task<string> errorTask = process.StandardError.ReadToEndAsync();
 
                 int timeout = 60000; // Increased timeout to 60 seconds
                 bool exited = await Task.Run(() => process.WaitForExit(timeout));
@@ -116,20 +174,20 @@ public class CloudPack(CloudPackConfig config)
                     
                     if (attempt < maxAttempts)
                     {
-                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress, 
+                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress,
                             attempt, maxAttempts, "Timed out, retrying...");
                         await Task.Delay(RetryDelayMs);
                         continue;
                     }
-                    
-                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed, 
+
+                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed,
                         attempt, maxAttempts, "Packing timed out");
                     Issues.AddPackingIssue(project);
                     return false;
                 }
 
-                string output = await process.StandardOutput.ReadToEndAsync();
-                string error = await process.StandardError.ReadToEndAsync();
+                string output = await outputTask;
+                string error = await errorTask;
 
                 // Fixed: ExitCode == 0 means success, not != 0
                 bool succeeded = process.ExitCode == 0;
@@ -139,18 +197,18 @@ public class CloudPack(CloudPackConfig config)
                     // Double-check by looking for the actual package file
                     string version = GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? throw new Exception("Version is missing");
                     string packagePath = $"./nupkgs/{project.AssemblyName}.{version}.nupkg";
-                    
+
                     if (File.Exists(packagePath))
                     {
                         succeeded = true;
-                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Warning, 
+                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Warning,
                             attempt, maxAttempts, "Packed (exit code warning)");
                     }
                 }
 
                 if (succeeded)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Success, 
+                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Success,
                         attempt, maxAttempts, "Packed successfully");
                     return true;
                 }
@@ -158,15 +216,18 @@ public class CloudPack(CloudPackConfig config)
                 {
                     if (attempt < maxAttempts)
                     {
-                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress, 
-                            attempt, maxAttempts, $"Failed, retrying... ({error.Split('\n').FirstOrDefault()?.Trim()})");
+                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress,
+                            attempt, maxAttempts, "Failed, retrying...");
                         await Task.Delay(RetryDelayMs);
                         continue;
                     }
                     else
                     {
-                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed, 
-                            attempt, maxAttempts, $"Failed: {error.Split('\n').FirstOrDefault()?.Trim()}");
+                        _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed,
+                            attempt, maxAttempts, "Failed");
+
+                        foreach (string line in ExtractErrors(output, error))
+                            _logger.LogError($"{project.Name}: {line}");
                     }
                 }
             }
@@ -174,15 +235,16 @@ public class CloudPack(CloudPackConfig config)
             {
                 if (attempt < maxAttempts)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress, 
-                        attempt, maxAttempts, $"Exception, retrying... ({ex.Message})");
+                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.InProgress,
+                        attempt, maxAttempts, "Exception, retrying...");
                     await Task.Delay(RetryDelayMs);
                     continue;
                 }
                 else
                 {
-                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed, 
-                        attempt, maxAttempts, $"Exception: {ex.Message}");
+                    _logger.UpdateProjectStatus(project.Name, "pack", ModernConsoleLogger.Status.Failed,
+                        attempt, maxAttempts, "Exception");
+                    _logger.LogError($"{project.Name}: {ex.Message}");
                 }
             }
         }
@@ -212,8 +274,8 @@ public class CloudPack(CloudPackConfig config)
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress, 
-                attempt, maxAttempts, $"Publishing... (attempt {attempt}/{maxAttempts})");
+            _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
+                attempt, maxAttempts, "Publishing...");
             
             try
             {
@@ -232,11 +294,15 @@ public class CloudPack(CloudPackConfig config)
                 };
 
                 process.Start();
-                
+
+                // Read stdout/stderr concurrently to avoid deadlock on full output buffers
+                Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+                Task<string> errorTask = process.StandardError.ReadToEndAsync();
+
                 // Increased timeout for publishing (can be slow)
                 int timeout = 120000; // 2 minutes
                 bool exited = await Task.Run(() => process.WaitForExit(timeout));
-                
+
                 if (!exited)
                 {
                     try
@@ -248,56 +314,60 @@ public class CloudPack(CloudPackConfig config)
                     {
                         // Process already exited
                     }
-                    
+
                     if (attempt < maxAttempts)
                     {
-                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress, 
+                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
                             attempt, maxAttempts, "Timed out, retrying...");
                         await Task.Delay(RetryDelayMs * 2);
                         continue;
                     }
-                    
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed, 
+
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed,
                         attempt, maxAttempts, "Publishing timed out");
                     Issues.AddPublishingIssue(project);
                     return false;
                 }
 
-                string output = await process.StandardOutput.ReadToEndAsync();
-                string error = await process.StandardError.ReadToEndAsync();
+                string output = await outputTask;
+                string error = await errorTask;
 
                 if (process.ExitCode == 0)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Success, 
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Success,
                         attempt, maxAttempts, "Published successfully");
                     return true;
                 }
                 else if (error.Contains("409") || error.Contains("Conflict") || output.Contains("already exists"))
                 {
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Warning, 
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Warning,
                         attempt, maxAttempts, "Already exists (skipped)");
-                    return true; // This is not an error condition
+                    return true;
                 }
                 else
                 {
-                    // Check for specific retry-able errors
-                    bool shouldRetry = error.Contains("timeout") || 
-                                     error.Contains("network") || 
-                                     error.Contains("502") || 
-                                     error.Contains("503") || 
-                                     error.Contains("504");
-                    
+                    string combined = output + "\n" + error;
+                    bool shouldRetry = combined.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                                       combined.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+                                       combined.Contains("502") ||
+                                       combined.Contains("503") ||
+                                       combined.Contains("504");
+
                     if (shouldRetry && attempt < maxAttempts)
                     {
-                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress, 
-                            attempt, maxAttempts, $"Network error, retrying... ({error.Split('\n').FirstOrDefault()?.Trim()})");
+                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
+                            attempt, maxAttempts, "Network error, retrying...");
                         await Task.Delay(RetryDelayMs * 2);
                         continue;
                     }
                     else if (attempt >= maxAttempts)
                     {
-                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed, 
-                            attempt, maxAttempts, $"Failed: {error.Split('\n').FirstOrDefault()?.Trim()}");
+                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed,
+                            attempt, maxAttempts, "Failed");
+
+                        foreach (string line in ExtractErrors(output, error))
+                            _logger.LogError($"{project.Name}: {line}");
+
                         break;
                     }
                 }
@@ -306,15 +376,16 @@ public class CloudPack(CloudPackConfig config)
             {
                 if (attempt < maxAttempts)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress, 
-                        attempt, maxAttempts, $"Exception, retrying... ({ex.Message})");
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
+                        attempt, maxAttempts, "Exception, retrying...");
                     await Task.Delay(RetryDelayMs * 2);
                     continue;
                 }
                 else
                 {
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed, 
-                        attempt, maxAttempts, $"Exception: {ex.Message}");
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed,
+                        attempt, maxAttempts, "Exception");
+                    _logger.LogError($"{project.Name}: {ex.Message}");
                 }
             }
         }
@@ -326,19 +397,18 @@ public class CloudPack(CloudPackConfig config)
     async Task<bool> RebuildProject(CloudPackProject project)
     {
         const int maxAttempts = 2;
-        
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress, 
-                attempt, maxAttempts, $"Cleaning... (attempt {attempt}/{maxAttempts})");
-            
-            // Clean the project
+            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress,
+                attempt, maxAttempts, "Cleaning...");
+
             using var cleanProcess = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "dotnet",
-                    Arguments = $"clean \"{project.FilePath}\" --nologo --verbosity quiet",
+                    Arguments = $"clean \"{project.FilePath}\" --nologo --verbosity minimal",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -347,36 +417,39 @@ public class CloudPack(CloudPackConfig config)
             };
 
             cleanProcess.Start();
+            Task<string> cleanOut = cleanProcess.StandardOutput.ReadToEndAsync();
+            Task<string> cleanErr = cleanProcess.StandardError.ReadToEndAsync();
             await cleanProcess.WaitForExitAsync();
+            await Task.WhenAll(cleanOut, cleanErr);
 
             if (cleanProcess.ExitCode != 0)
             {
-                string cleanError = await cleanProcess.StandardError.ReadToEndAsync();
-                
                 if (attempt < maxAttempts)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress, 
+                    _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress,
                         attempt, maxAttempts, "Clean failed, retrying...");
                     await Task.Delay(RetryDelayMs);
                     continue;
                 }
-                
-                _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Failed, 
-                    attempt, maxAttempts, $"Clean failed: {cleanError.Split('\n').FirstOrDefault()?.Trim()}");
+
+                _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Failed,
+                    attempt, maxAttempts, "Clean failed");
+
+                foreach (string line in ExtractErrors(await cleanOut, await cleanErr))
+                    _logger.LogError($"{project.Name}: {line}");
                 Issues.AddRebuildIssue(project);
                 return false;
             }
 
-            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress, 
-                attempt, maxAttempts, $"Building... (attempt {attempt}/{maxAttempts})");
-            
-            // Rebuild the project
+            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress,
+                attempt, maxAttempts, "Building...");
+
             using var buildProcess = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "dotnet",
-                    Arguments = $"build \"{project.FilePath}\" -c Release /p:WarningLevel=0 --nologo --verbosity quiet",
+                    Arguments = $"build \"{project.FilePath}\" -c Release /p:WarningLevel=0 --nologo --verbosity minimal",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -385,31 +458,35 @@ public class CloudPack(CloudPackConfig config)
             };
 
             buildProcess.Start();
+            Task<string> buildOut = buildProcess.StandardOutput.ReadToEndAsync();
+            Task<string> buildErr = buildProcess.StandardError.ReadToEndAsync();
             await buildProcess.WaitForExitAsync();
+            await Task.WhenAll(buildOut, buildErr);
 
             if (buildProcess.ExitCode != 0)
             {
-                string buildError = await buildProcess.StandardError.ReadToEndAsync();
-                
                 if (attempt < maxAttempts)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress, 
+                    _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.InProgress,
                         attempt, maxAttempts, "Build failed, retrying...");
                     await Task.Delay(RetryDelayMs);
                     continue;
                 }
-                
-                _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Failed, 
-                    attempt, maxAttempts, $"Build failed: {buildError.Split('\n').FirstOrDefault()?.Trim()}");
+
+                _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Failed,
+                    attempt, maxAttempts, "Build failed");
+
+                foreach (string line in ExtractErrors(await buildOut, await buildErr))
+                    _logger.LogError($"{project.Name}: {line}");
                 Issues.AddRebuildIssue(project);
                 return false;
             }
-            
-            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Success, 
+
+            _logger.UpdateProjectStatus(project.Name, "rebuild", ModernConsoleLogger.Status.Success,
                 attempt, maxAttempts, "Built successfully");
             return true;
         }
-        
+
         return false;
     }
 
@@ -456,6 +533,34 @@ public class CloudPack(CloudPackConfig config)
             {
                 UpdateProjectNode(project, metadata, value);
                 await UpdateProjectMetadata(project);
+            }
+        }
+
+        // Copy package logo from source project to target projects
+        string? packageIcon = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/PackageIcon");
+
+        if (!string.IsNullOrEmpty(packageIcon))
+        {
+            string sourceProjectDir = Path.GetDirectoryName(Path.GetFullPath(sourceProject.FilePath))!;
+            string sourceIconPath = Path.Combine(sourceProjectDir, packageIcon);
+
+            if (File.Exists(sourceIconPath))
+            {
+                foreach (CloudPackProject project in Projects.Where(key => key.UpdateMetadata))
+                {
+                    string targetProjectDir = Path.GetDirectoryName(Path.GetFullPath(project.FilePath))!;
+                    string targetIconPath = Path.Combine(targetProjectDir, packageIcon);
+
+                    File.Copy(sourceIconPath, targetIconPath, overwrite: true);
+
+                    UpdateProjectNode(project, "PropertyGroup/PackageIcon", packageIcon);
+                    EnsurePackageIconItemGroup(project, packageIcon);
+                    await UpdateProjectMetadata(project);
+                }
+            }
+            else
+            {
+                _logger.LogWarning($"Package icon '{packageIcon}' not found at '{sourceIconPath}'");
             }
         }
 
