@@ -15,6 +15,7 @@ internal class ModernConsoleLogger
         Pending,
         InProgress,
         Success,
+        Exists,
         Failed,
         Skipped,
         Warning
@@ -31,6 +32,12 @@ internal class ModernConsoleLogger
         public int MaxAttempts { get; set; } = 1;
     }
 
+    // Column widths (keep consistent so table does not shift)
+    private const int ProjectWidth = 30;
+    private const int SmallColWidth = 16; // rebuild/pack/publish
+    private const int StatusWidth = 30;
+    private string _publishVersion = string.Empty;
+
     public void Initialize(IEnumerable<CloudPackProject> projects)
     {
         _projects.Clear();
@@ -39,6 +46,8 @@ internal class ModernConsoleLogger
         foreach (var project in projects)
         {
             _projects.Add(new ProjectStatus { Name = project.Name });
+            if (string.IsNullOrEmpty(_publishVersion))
+                _publishVersion = CloudPack.GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? string.Empty;
         }
         
         Console.Clear();
@@ -55,6 +64,17 @@ internal class ModernConsoleLogger
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
+
+        if (!string.IsNullOrEmpty(_publishVersion))
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"Publishing version: {_publishVersion}");
+            Console.ResetColor();
+            Console.WriteLine();
+            _headerLines = 6;
+            return;
+        }
+
         _headerLines = 4;
     }
 
@@ -64,8 +84,16 @@ internal class ModernConsoleLogger
 
         // Header
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("Project".PadRight(30) + " │ " + "Rebuild".PadRight(12) + " │ " + "Pack".PadRight(12) + " │ " + "Publish".PadRight(12) + " │ " + "Status".PadRight(20));
-        Console.WriteLine(new string('─', 95));
+        string header = FormatCell("Project", ProjectWidth) + " │ " +
+                        FormatCell("Rebuild", SmallColWidth) + " │ " +
+                        FormatCell("Pack", SmallColWidth) + " │ " +
+                        FormatCell("Publish", SmallColWidth) + " │ " +
+                        FormatCell("Status", StatusWidth);
+
+        Console.WriteLine(header);
+
+        int tableWidth = ProjectWidth + SmallColWidth * 3 + StatusWidth + (3 * 4);
+        Console.WriteLine(new string('─', tableWidth));
         Console.ResetColor();
 
         // Projects
@@ -79,25 +107,23 @@ internal class ModernConsoleLogger
 
     private void DrawProjectLine(ProjectStatus project)
     {
-        Console.Write(project.Name.PadRight(30) + " │ ");
-        
-        WriteStatusWithColor(project.RebuildStatus, 12);
+        Console.Write(FormatCell(project.Name, ProjectWidth) + " │ ");
+
+        WriteStatusWithColor(project.RebuildStatus, SmallColWidth);
         Console.Write(" │ ");
-        
-        WriteStatusWithColor(project.PackStatus, 12);
+
+        WriteStatusWithColor(project.PackStatus, SmallColWidth);
         Console.Write(" │ ");
-        
-        WriteStatusWithColor(project.PublishStatus, 12);
+
+        WriteStatusWithColor(project.PublishStatus, SmallColWidth);
         Console.Write(" │ ");
-        
+
         string statusText = project.CurrentOperation;
         if (project.AttemptCount > 1)
-        {
-            statusText += $" ({project.AttemptCount}/{project.MaxAttempts})";
-        }
-        
+            statusText = statusText + $" ({project.AttemptCount}/{project.MaxAttempts})";
+
         Console.ForegroundColor = GetStatusColor(GetOverallStatus(project));
-        Console.Write(statusText.PadRight(20));
+        Console.Write(FormatCell(statusText, StatusWidth));
         Console.ResetColor();
         Console.WriteLine();
     }
@@ -106,8 +132,18 @@ internal class ModernConsoleLogger
     {
         Console.ForegroundColor = GetStatusColor(status);
         string statusText = GetStatusSymbol(status) + " " + status.ToString();
-        Console.Write(statusText.PadRight(width));
+        Console.Write(FormatCell(statusText, width));
         Console.ResetColor();
+    }
+
+    private static string FormatCell(string text, int width)
+    {
+        if (text == null) text = string.Empty;
+        if (text.Length == width) return text;
+        if (text.Length < width) return text.PadRight(width);
+        // truncate and reserve last char for ellipsis
+        if (width <= 1) return text.Substring(0, width);
+        return text.Substring(0, width - 1) + "…";
     }
 
     private static ConsoleColor GetStatusColor(Status status) => status switch
@@ -115,6 +151,7 @@ internal class ModernConsoleLogger
         Status.Pending => ConsoleColor.Gray,
         Status.InProgress => ConsoleColor.Yellow,
         Status.Success => ConsoleColor.Green,
+        Status.Exists => ConsoleColor.Blue,
         Status.Failed => ConsoleColor.Red,
         Status.Skipped => ConsoleColor.DarkYellow,
         Status.Warning => ConsoleColor.Magenta,
@@ -123,13 +160,14 @@ internal class ModernConsoleLogger
 
     private static string GetStatusSymbol(Status status) => status switch
     {
-        Status.Pending => "⏳",
-        Status.InProgress => "🔄",
-        Status.Success => "✅",
-        Status.Failed => "❌",
-        Status.Skipped => "⏭️",
-        Status.Warning => "⚠️",
-        _ => "❓"
+        Status.Pending => "[ ]",
+        Status.InProgress => "[~]",
+        Status.Success => "[+]",
+        Status.Exists => "[=]",
+        Status.Failed => "[-]",
+        Status.Skipped => "[>]",
+        Status.Warning => "[!]",
+        _ => "[?]"
     };
 
     private static Status GetOverallStatus(ProjectStatus project)
@@ -218,21 +256,21 @@ internal class ModernConsoleLogger
 
     public void LogHeading(string heading)
     {
-        WriteLogLine($"\n📦 {heading}", ConsoleColor.Cyan);
+        WriteLogLine($"\nPACK: {heading}", ConsoleColor.Cyan);
         _logLineOffset++; // account for the \n
     }
 
-    public void LogInfo(string message) => WriteLogLine($"ℹ️  {message}");
+    public void LogInfo(string message) => WriteLogLine($"INFO: {message}");
 
-    public void LogWarning(string message) => WriteLogLine($"⚠️  {message}", ConsoleColor.Yellow);
+    public void LogWarning(string message) => WriteLogLine($"WARNING: {message}", ConsoleColor.Yellow);
 
     public void LogError(string message)
     {
         _errors.Add(message);
-        WriteLogLine($"❌ {message}", ConsoleColor.Red);
+        WriteLogLine($"ERROR: {message}", ConsoleColor.Red);
     }
 
-    public void LogSuccess(string message) => WriteLogLine($"✅ {message}", ConsoleColor.Green);
+    public void LogSuccess(string message) => WriteLogLine($"SUCCESS: {message}", ConsoleColor.Green);
 
     public void Complete()
     {
@@ -243,7 +281,7 @@ internal class ModernConsoleLogger
         
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(new string('═', 95));
-        Console.WriteLine("📋 Final Summary:");
+        Console.WriteLine("Final Summary:");
         Console.WriteLine(new string('═', 95));
         Console.ResetColor();
 
@@ -254,21 +292,21 @@ internal class ModernConsoleLogger
         if (successful > 0)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"✅ {successful} project(s) completed successfully");
+            Console.WriteLine($"Successful: {successful} project(s)");
             Console.ResetColor();
         }
 
         if (warnings > 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"⚠️  {warnings} project(s) completed with warnings");
+            Console.WriteLine($"Warnings: {warnings} project(s)");
             Console.ResetColor();
         }
 
         if (failed > 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ {failed} project(s) failed");
+            Console.WriteLine($"Failed: {failed} project(s)");
             Console.ResetColor();
         }
 

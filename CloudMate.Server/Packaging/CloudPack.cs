@@ -332,44 +332,48 @@ public class CloudPack(CloudPackConfig config)
                 string output = await outputTask;
                 string error = await errorTask;
 
+                string combined = output + "\n" + error;
+
+                // If the output contains evidence that the package already exists (Conflict, 409, or explicit message),
+                // treat as AlreadyPublished even if exit code is 0.
+                if (combined.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
+                    combined.Contains("409") ||
+                    combined.Contains("conflict", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Exists,
+                        attempt, maxAttempts, "Already published");
+                    return true;
+                }
+
                 if (process.ExitCode == 0)
                 {
                     _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Success,
                         attempt, maxAttempts, "Published successfully");
                     return true;
                 }
-                else if (error.Contains("409") || error.Contains("Conflict") || output.Contains("already exists"))
+
+                bool shouldRetry = combined.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                                   combined.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+                                   combined.Contains("502") ||
+                                   combined.Contains("503") ||
+                                   combined.Contains("504");
+
+                if (shouldRetry && attempt < maxAttempts)
                 {
-                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Warning,
-                        attempt, maxAttempts, "Already exists (skipped)");
-                    return true;
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
+                        attempt, maxAttempts, "Network error, retrying...");
+                    await Task.Delay(RetryDelayMs * 2);
+                    continue;
                 }
-                else
+                else if (attempt >= maxAttempts)
                 {
-                    string combined = output + "\n" + error;
-                    bool shouldRetry = combined.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
-                                       combined.Contains("network", StringComparison.OrdinalIgnoreCase) ||
-                                       combined.Contains("502") ||
-                                       combined.Contains("503") ||
-                                       combined.Contains("504");
+                    _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed,
+                        attempt, maxAttempts, "Failed");
 
-                    if (shouldRetry && attempt < maxAttempts)
-                    {
-                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.InProgress,
-                            attempt, maxAttempts, "Network error, retrying...");
-                        await Task.Delay(RetryDelayMs * 2);
-                        continue;
-                    }
-                    else if (attempt >= maxAttempts)
-                    {
-                        _logger.UpdateProjectStatus(project.Name, "publish", ModernConsoleLogger.Status.Failed,
-                            attempt, maxAttempts, "Failed");
+                    foreach (string line in ExtractErrors(output, error))
+                        _logger.LogError($"{project.Name}: {line}");
 
-                        foreach (string line in ExtractErrors(output, error))
-                            _logger.LogError($"{project.Name}: {line}");
-
-                        break;
-                    }
+                    break;
                 }
             }
             catch (Exception ex)
