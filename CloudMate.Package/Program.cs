@@ -11,12 +11,20 @@ var builder = new ConfigurationBuilder()
     .AddUserSecrets<Program>();
 
 IConfigurationRoot configuration = builder.Build();
-string apiKey = configuration["NuGetApiKey"];
+string? apiKey = configuration["NuGetApiKey"];
 
 await new CloudPack(new CloudPackConfig() { NugetApiKey = apiKey })
 {
+    MetadataProperies =
+    [
+        "PropertyGroup/Authors",
+        "PropertyGroup/Company",
+        "PropertyGroup/AssemblyVersion",
+        "PropertyGroup/FileVersion",
+        "PropertyGroup/PackageIcon"
+    ],
     Projects =
     [
-        new CloudPackProject("CloudMate.Server") { UpdateVersion = false, UpdateMetadata = false }
+        new CloudPackProject("CloudMate.Server")
     ]
 }.Pack();
