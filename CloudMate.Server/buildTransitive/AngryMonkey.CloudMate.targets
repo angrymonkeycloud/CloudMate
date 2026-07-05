@@ -1,0 +1,13 @@
+<Project>
+  <Target Name="AngryMonkeyCloudMateRemoveBuildOutput" AfterTargets="ResolveReferences">
+	<ItemGroup>
+	  <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'AngryMonkey.CloudMate'" />
+	</ItemGroup>
+  </Target>
+
+  <Target Name="AngryMonkeyCloudMateRemovePublishOutput" BeforeTargets="ComputeFilesToPublish">
+	<ItemGroup>
+	  <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.NuGetPackageId)' == 'AngryMonkey.CloudMate'" />
+	</ItemGroup>
+  </Target>
+</Project>
