@@ -25,6 +25,8 @@ await new CloudPack(new CloudPackConfig() { NugetApiKey = apiKey })
     ],
     Projects =
     [
-        new CloudPackProject("CloudMate.Server")
+        new CloudPackProject("CloudMate.Server"),
+        new CloudPackProject("CloudMate.Bundler"),
+        new CloudPackProject("CloudMate.CLI")
     ]
 }.Pack();

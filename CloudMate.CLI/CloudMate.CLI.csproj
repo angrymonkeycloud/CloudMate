@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AssemblyName>mate</AssemblyName>
+		<RootNamespace>AngryMonkey.CloudMate</RootNamespace>
+		<Authors>Angry Monkey</Authors>
+		<Company>Angry Monkey</Company>
+		<Description>CloudMate CLI — compile, bundle, compress, and watch web assets.</Description>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>$(Version)</AssemblyVersion>
+		<FileVersion>$(Version)</FileVersion>
+		<!-- dotnet tool metadata -->
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>mate</ToolCommandName>
+		<PackageId>AngryMonkey.CloudMate.CLI</PackageId>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\CloudMate.Bundler\CloudMate.Bundler.csproj" />
+	</ItemGroup>
+
+</Project>

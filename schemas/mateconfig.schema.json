@@ -1,0 +1,169 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://raw.githubusercontent.com/angrymonkeycloud/CloudMate/master/schemas/mateconfig.schema.json",
+    "title": "CloudMate Configuration",
+    "description": "Configuration for the CloudMate bundler (mate CLI): compiles, bundles, renames, minifies TypeScript/LESS/SCSS/CSS/JS and compresses images.",
+    "type": "object",
+    "definitions": {
+        "stringOrStringArray": {
+            "oneOf": [
+                { "type": "string" },
+                {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            ]
+        }
+    },
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Project name, used when a build enables outDirName. Falls back to package.json name."
+        },
+        "version": {
+            "type": "string",
+            "description": "Project version, used when a build enables outDirVersioning. Falls back to package.json version."
+        },
+        "builds": {
+            "type": "array",
+            "description": "Build configurations. A 'dev' build always exists even when not declared.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Build name, referenced from files[].builds and CLI arguments."
+                    },
+                    "outDir": {
+                        "type": "string",
+                        "description": "Output directory override. Defaults to each output file's own directory."
+                    },
+                    "outDirVersioning": {
+                        "type": "boolean",
+                        "description": "Appends /{version} to the output directory.",
+                        "default": false
+                    },
+                    "outDirName": {
+                        "type": "boolean",
+                        "description": "Appends /{name} to the output directory.",
+                        "default": false
+                    },
+                    "ts": {
+                        "type": "string",
+                        "description": "Path to the tsconfig.json used for TypeScript compilation. Auto-detected when omitted."
+                    },
+                    "css": {
+                        "type": "object",
+                        "description": "CSS pipeline options for this build.",
+                        "properties": {
+                            "minify": {
+                                "type": "boolean",
+                                "description": "Additionally writes a .min.css next to the output.",
+                                "default": true
+                            },
+                            "sourceMap": {
+                                "type": "boolean",
+                                "description": "Emits inline source maps for compiled LESS/SCSS.",
+                                "default": false
+                            },
+                            "outDirSuffix": {
+                                "type": "string",
+                                "description": "Appended to the output directory for CSS outputs."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "js": {
+                        "type": "object",
+                        "description": "JavaScript pipeline options for this build.",
+                        "properties": {
+                            "minify": {
+                                "type": "boolean",
+                                "description": "Additionally writes a .min.js next to the output.",
+                                "default": true
+                            },
+                            "sourceMap": {
+                                "type": "boolean",
+                                "description": "Emits inline source maps for compiled TypeScript.",
+                                "default": true
+                            },
+                            "declaration": {
+                                "type": "boolean",
+                                "description": "Generates a .d.ts declaration file for TypeScript inputs.",
+                                "default": true
+                            },
+                            "webClean": {
+                                "type": "boolean",
+                                "description": "Removes module artifacts (import/require/exports) for browser-friendly output.",
+                                "default": false
+                            },
+                            "outDirSuffix": {
+                                "type": "string",
+                                "description": "Appended to the output directory for JS outputs."
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "required": [ "name" ],
+                "additionalProperties": false
+            }
+        },
+        "files": {
+            "type": "array",
+            "description": "Bundle definitions: each entry compiles/concatenates its inputs into every listed output.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "$ref": "#/definitions/stringOrStringArray",
+                        "description": "Input file paths or glob patterns (ts, less, scss, css, js). Order defines concatenation order."
+                    },
+                    "output": {
+                        "$ref": "#/definitions/stringOrStringArray",
+                        "description": "Output file path(s). The extension (.js/.css) selects the pipeline."
+                    },
+                    "builds": {
+                        "$ref": "#/definitions/stringOrStringArray",
+                        "description": "Build names this entry applies to.",
+                        "default": [ "dev" ]
+                    }
+                },
+                "required": [ "input", "output" ],
+                "additionalProperties": false
+            }
+        },
+        "images": {
+            "type": "array",
+            "description": "Image compression definitions.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "$ref": "#/definitions/stringOrStringArray",
+                        "description": "Input image paths or glob patterns (png, jpg, jpeg, gif, webp, tiff, svg)."
+                    },
+                    "output": {
+                        "$ref": "#/definitions/stringOrStringArray",
+                        "description": "Output directory path(s)."
+                    },
+                    "maxWidth": {
+                        "type": "integer",
+                        "description": "Maximum width; larger images are scaled down proportionally (never enlarged)."
+                    },
+                    "maxHeight": {
+                        "type": "integer",
+                        "description": "Maximum height; larger images are scaled down proportionally (never enlarged)."
+                    },
+                    "outputFormat": {
+                        "type": "string",
+                        "description": "Converts images to this format.",
+                        "enum": [ "png", "jpg", "jpeg", "gif", "webp", "tiff" ]
+                    }
+                },
+                "required": [ "input", "output" ],
+                "additionalProperties": false
+            }
+        }
+    }
+}
