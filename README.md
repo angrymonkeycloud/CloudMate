@@ -9,7 +9,7 @@
 
 **A .NET 10 utility library for NuGet packaging automation, project code generation, compression, and C# code formatting.**
 
-[Getting Started](#getting-started) Â· [CloudPack](#cloudpack) Â· [CloudCode](#cloudcode) Â· [CloudCompression](#cloudcompression) Â· [CoreCSharp Formatter](#corecsharp-formatter)
+[Getting Started](#getting-started) · [CloudPack](#cloudpack) · [CloudCode](#cloudcode) · [CloudCompression](#cloudcompression) · [CoreCSharp Formatter](#corecsharp-formatter)
 
 </div>
 
@@ -26,7 +26,7 @@ CloudMate is a compile-time .NET helper library (`AngryMonkey.CloudMate`) that p
 | **Compression** | `CloudCompression` | Creates in-memory ZIP archives from strings or byte arrays |
 | **Code Formatting** | `CoreCSharp` | Normalizes indentation and line spacing in generated C# code |
 
-> **Compile-time only** â€” CloudMate ships with MSBuild targets that automatically remove it from consumer build and publish output, keeping your applications lean.
+> **Compile-time only** €” CloudMate ships with MSBuild targets that automatically remove it from consumer build and publish output, keeping your applications lean.
 
 ---
 
@@ -54,18 +54,18 @@ using AngryMonkey.CloudMate;
 
 ## CloudPack
 
-`CloudPack` automates the full NuGet release pipeline: syncing version and metadata across projects, rebuilding in Release mode, packing to `.nupkg`, and publishing to nuget.org â€” with retry logic and a styled console UI.
+`CloudPack` automates the full NuGet release pipeline: syncing version and metadata across projects, rebuilding in Release mode, packing to `.nupkg`, and publishing to nuget.org €” with retry logic and a styled console UI.
 
 ### Pipeline Phases
 
 ```
-[Update Metadata] â†’ [Rebuild] â†’ [Pack] â†’ [Publish]
+[Update Metadata] †’ [Rebuild] †’ [Pack] †’ [Publish]
 ```
 
-1. **Update Metadata** â€” reads version, authors, company, icon, and other properties from a source project and propagates them to all target projects.
-2. **Rebuild** â€” runs `dotnet clean` then `dotnet build -c Release` on each project.
-3. **Pack** â€” runs `dotnet pack -c Release -o ./nupkgs` and outputs `.nupkg` files.
-4. **Publish** â€” runs `dotnet nuget push` to nuget.org, detecting duplicates and retrying on transient network errors.
+1. **Update Metadata** €” reads version, authors, company, icon, and other properties from a source project and propagates them to all target projects.
+2. **Rebuild** €” runs `dotnet clean` then `dotnet build -c Release` on each project.
+3. **Pack** €” runs `dotnet pack -c Release -o ./nupkgs` and outputs `.nupkg` files.
+4. **Publish** €” runs `dotnet nuget push` to nuget.org, detecting duplicates and retrying on transient network errors.
 
 ### Basic Usage
 
@@ -277,7 +277,7 @@ new CloudCode.ProjectLocalReference
 
 ## CloudCompression
 
-`CloudCompression` creates in-memory ZIP archives from a collection of files, returning the raw bytes and MIME type â€” ideal for download endpoints or file-generation pipelines.
+`CloudCompression` creates in-memory ZIP archives from a collection of files, returning the raw bytes and MIME type €” ideal for download endpoints or file-generation pipelines.
 
 ### Creating a ZIP Archive
 
@@ -289,8 +289,8 @@ CloudCompression.Result result = CloudCompression.Zip(
     new CloudCompression.File("image.png", imageBytes)
 ]);
 
-// result.Content      â†’ byte[]
-// result.ContentType  â†’ "application/zip"
+// result.Content      †’ byte[]
+// result.ContentType  †’ "application/zip"
 ```
 
 ### Using the Result in ASP.NET Core
@@ -342,8 +342,8 @@ string formatted = CoreCSharp.Format(rawCode);
 
 `Format()` applies two passes:
 
-1. **Line spacing** â€” inserts blank lines before `namespace`, `if`, `for`, `foreach`, `try`, `return`, `switch`, `case`, and `default` keywords.
-2. **Indentation** â€” normalises tab-based indentation according to `{` / `}` depth.
+1. **Line spacing** €” inserts blank lines before `namespace`, `if`, `for`, `foreach`, `try`, `return`, `switch`, `case`, and `default` keywords.
+2. **Indentation** €” normalises tab-based indentation according to `{` / `}` depth.
 
 ### Building Switch Statements
 
@@ -409,8 +409,8 @@ CloudMate includes MSBuild targets ensuring the library is **never copied to con
 
 The targets (shipped in `buildTransitive/`) perform two automatic removals:
 
-- **After `ResolveReferences`** â€” removes `AngryMonkey.CloudMate` from local copy paths.
-- **Before `ComputeFilesToPublish`** â€” removes it from publish output.
+- **After `ResolveReferences`** €” removes `AngryMonkey.CloudMate` from local copy paths.
+- **Before `ComputeFilesToPublish`** €” removes it from publish output.
 
 No manual configuration is needed; these targets activate automatically for any project that references the package.
 
@@ -420,13 +420,13 @@ No manual configuration is needed; these targets activate automatically for any 
 
 ```
 CloudMate/
-â”œâ”€â”€ CloudMate.Server/          # Core library (AngryMonkey.CloudMate)
-â”‚   â”œâ”€â”€ Code/                  # CloudCode â€” .csproj generation
-â”‚   â”œâ”€â”€ Compression/           # CloudCompression â€” ZIP utilities
-â”‚   â”œâ”€â”€ Formatter/             # CoreCSharp â€” code formatting & AST builders
-â”‚   â”œâ”€â”€ Packaging/             # CloudPack â€” NuGet automation
-â”‚   â””â”€â”€ buildTransitive/       # MSBuild targets (no runtime footprint)
-â””â”€â”€ CloudMate.Package/         # CLI tool that publishes CloudMate itself
+”œ”€”€ CloudMate.Server/          # Core library (AngryMonkey.CloudMate)
+”‚   ”œ”€”€ Code/                  # CloudCode €” .csproj generation
+”‚   ”œ”€”€ Compression/           # CloudCompression €” ZIP utilities
+”‚   ”œ”€”€ Formatter/             # CoreCSharp €” code formatting & AST builders
+”‚   ”œ”€”€ Packaging/             # CloudPack €” NuGet automation
+”‚   ”””€”€ buildTransitive/       # MSBuild targets (no runtime footprint)
+”””€”€ CloudMate.Package/         # CLI tool that publishes CloudMate itself
 ```
 
 ---
@@ -439,6 +439,6 @@ Contributions, issues, and feature requests are welcome. Please open an issue or
 
 <div align="center">
 
-Made with â¤ï¸ by [Angry Monkey](https://github.com/angrymonkeycloud)
+Made with ¤ï¸ by [Angry Monkey](https://github.com/angrymonkeycloud)
 
 </div>
