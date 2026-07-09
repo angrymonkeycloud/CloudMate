@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
+				 xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+	<Identity Id="CloudMate.VSIX" Version="1.0.2" Language="en-US"
+			  Publisher="AngryMonkey" />
+	<DisplayName>CloudMate</DisplayName>
+	<Description xml:space="preserve">
+	  Compile, bundle, compress, and watch web assets (TypeScript, LESS, SCSS, CSS, JS) using
+	  the CloudMate (mate) CLI. Adds context menus on solution explorer items and an auto-watch
+	  feature that rebuilds on every supported file change.
+	</Description>
+	<MoreInfo>https://github.com/angrymonkeycloud/CloudMate</MoreInfo>
+	<Icon>amc-logo.png</Icon>
+	<Tags>typescript less scss sass css bundler minifier cloudmate</Tags>
+  </Metadata>
+  <Installation>
+	<InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[18.0,19.0)">
+	  <ProductArchitecture>amd64</ProductArchitecture>
+	</InstallationTarget>
+	<InstallationTarget Id="Microsoft.VisualStudio.Professional" Version="[18.0,19.0)">
+	  <ProductArchitecture>amd64</ProductArchitecture>
+	</InstallationTarget>
+	<InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[18.0,19.0)">
+	  <ProductArchitecture>amd64</ProductArchitecture>
+	</InstallationTarget>
+  </Installation>
+  <Dependencies>
+	<Dependency Id="Microsoft.Framework.NDP" DisplayName=".NET Framework" Version="[4.8,)" />
+  </Dependencies>
+  <Prerequisites>
+	<Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[18.0,19.0)" DisplayName="Visual Studio core editor"/>
+  </Prerequisites>
+  <Assets>
+	<Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|CloudMate.VSIX;PkgdefProjectOutputGroup|" />
+	<Asset Type="Microsoft.VisualStudio.MefComponent" Path="|CloudMate.VSIX|" />
+  </Assets>
+</PackageManifest>

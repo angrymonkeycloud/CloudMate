@@ -1,0 +1,90 @@
+{
+  "name": "cloudmate",
+  "displayName": "CloudMate",
+  "description": "Compile, bundle, compress, and watch web assets using the CloudMate (mate) CLI.",
+  "version": "1.0.0",
+  "publisher": "AngryMonkey",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angrymonkeycloud/CloudMate"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["typescript", "less", "scss", "sass", "bundler", "minifier", "cloudmate"],
+  "activationEvents": ["workspaceContains:**/.mateconfig*", "workspaceContains:**/mateconfig.json"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cloudmate.build",
+        "title": "CloudMate: Build",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cloudmate.buildAll",
+        "title": "CloudMate: Build All",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "cloudmate.watch",
+        "title": "CloudMate: Watch",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "cloudmate.stopWatch",
+        "title": "CloudMate: Stop Watch",
+        "icon": "$(debug-stop)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "cloudmate.build" },
+        { "command": "cloudmate.buildAll" },
+        { "command": "cloudmate.watch" },
+        { "command": "cloudmate.stopWatch", "when": "cloudmate.watching" }
+      ],
+      "explorer/context": [
+        {
+          "command": "cloudmate.build",
+          "group": "cloudmate@1",
+          "when": "explorerResourceIsFolder || resourceExtname =~ /\\.(ts|less|scss|sass|css|js|mateconfig)$/ || resourceFilename =~ /mateconfig/"
+        },
+        {
+          "command": "cloudmate.buildAll",
+          "group": "cloudmate@2",
+          "when": "explorerResourceIsFolder || resourceExtname =~ /\\.(ts|less|scss|sass|css|js|mateconfig)$/ || resourceFilename =~ /mateconfig/"
+        },
+        {
+          "command": "cloudmate.watch",
+          "group": "cloudmate@3",
+          "when": "explorerResourceIsFolder || resourceExtname =~ /\\.(ts|less|scss|sass|css|js|mateconfig)$/ || resourceFilename =~ /mateconfig/"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CloudMate",
+      "properties": {
+        "cloudmate.matePath": {
+          "type": "string",
+          "default": "mate",
+          "description": "Path to the mate CLI executable. Defaults to 'mate' (assumes it is on PATH). Change this if mate is installed in a custom location."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

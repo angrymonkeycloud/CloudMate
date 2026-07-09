@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
+			  xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <!--
+	CloudMate command table.
+	Declares a "CloudMate" submenu on the Solution Explorer item, folder, and project
+	context menus. Command visibility is decided at runtime (BeforeQueryStatus):
+	  - Compile         : shown for any file EXCEPT .mateconfig.json
+	  - Compress Images : shown for folders
+	  - Build           : shown only for .mateconfig.json
+	  - Build All       : shown only for .mateconfig.json
+	  - Watch           : shown only for .mateconfig.json
+	VSCT cannot filter by file name, so all five buttons are declared here and the
+	individual command handlers toggle OleMenuCommand.Visible based on the selection.
+  -->
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidCloudMatePackage">
+
+	<!-- ═══ Menus (submenus) ════════════════════════════════════════════════ -->
+	<Menus>
+	  <!--
+		The CloudMate submenu that appears inside the Solution Explorer context menus.
+		It is placed in guidCloudMateGroup (declared in Groups below), which is in turn
+		parented to the three shell context menus.
+	  -->
+	  <Menu guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0600" type="Menu">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroup"/>
+		<Strings>
+		  <ButtonText>CloudMate</ButtonText>
+		  <CommandName>CloudMate</CommandName>
+		</Strings>
+	  </Menu>
+	</Menus>
+
+	<!-- ═══ Groups ══════════════════════════════════════════════════════════ -->
+	<Groups>
+	  <!--
+		guidCloudMateGroup: the top-level placeholder group.
+		Parented to the three Solution Explorer context menus so the CloudMate submenu
+		appears when right-clicking any file, folder, or project.
+
+		guidSHLMainMenu / IDM_VS_CTXT_ITEMNODE   = 0xd309f791 / 0x0430
+		guidSHLMainMenu / IDM_VS_CTXT_PROJNODE   = 0xd309f791 / 0x0402
+		guidSHLMainMenu / IDM_VS_CTXT_FOLDERNODE = 0xd309f791 / 0x0433
+	  -->
+	  <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroup" priority="0x0600">
+		<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+	  </Group>
+	  <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder" priority="0x0600">
+		<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_FOLDERNODE"/>
+	  </Group>
+	  <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj" priority="0x0600">
+		<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE"/>
+	  </Group>
+
+	  <!-- The command group inside the CloudMate submenu -->
+	  <Group guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup" priority="0x0100">
+		<Parent guid="guidCloudMateCmdSet" id="CloudMateSubMenu"/>
+	  </Group>
+	</Groups>
+
+	<!-- ═══ Buttons (commands) ══════════════════════════════════════════════ -->
+	<Buttons>
+
+	  <Button guid="guidCloudMateCmdSet" id="cmdidCompile" priority="0x0100" type="Button">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+		<CommandFlag>DynamicVisibility</CommandFlag>
+		<Strings>
+		  <ButtonText>Compile</ButtonText>
+		  <ToolTipText>Add this file to .mateconfig.json and compile with CloudMate</ToolTipText>
+		</Strings>
+	  </Button>
+
+	  <Button guid="guidCloudMateCmdSet" id="cmdidCompressImages" priority="0x0200" type="Button">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+		<Strings>
+		  <ButtonText>Compress Images</ButtonText>
+		  <ToolTipText>Add this folder to .mateconfig.json for CloudMate image compression</ToolTipText>
+		</Strings>
+	  </Button>
+
+	  <Button guid="guidCloudMateCmdSet" id="cmdidBuild" priority="0x0300" type="Button">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+		<CommandFlag>DynamicVisibility</CommandFlag>
+		<CommandFlag>DefaultInvisible</CommandFlag>
+		<Strings>
+		  <ButtonText>Build</ButtonText>
+		  <ToolTipText>Run CloudMate dev build (mate) for this .mateconfig.json</ToolTipText>
+		</Strings>
+	  </Button>
+
+	  <Button guid="guidCloudMateCmdSet" id="cmdidBuildAll" priority="0x0400" type="Button">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+		<CommandFlag>DynamicVisibility</CommandFlag>
+		<CommandFlag>DefaultInvisible</CommandFlag>
+		<Strings>
+		  <ButtonText>Build All</ButtonText>
+		  <ToolTipText>Run all CloudMate builds (mate --all) for this .mateconfig.json</ToolTipText>
+		</Strings>
+	  </Button>
+
+	  <Button guid="guidCloudMateCmdSet" id="cmdidWatch" priority="0x0500" type="Button">
+		<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+		<CommandFlag>DynamicVisibility</CommandFlag>
+		<CommandFlag>DefaultInvisible</CommandFlag>
+		<CommandFlag>TextChanges</CommandFlag>
+		<Strings>
+		  <ButtonText>Watch</ButtonText>
+		  <ToolTipText>Start or stop mate --watch for this .mateconfig.json</ToolTipText>
+		</Strings>
+	  </Button>
+
+	</Buttons>
+
+  </Commands>
+
+  <!-- ═══ Duplicate placements (folder/project groups also get the submenu) ═ -->
+  <CommandPlacements>
+	<CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0600">
+	  <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder"/>
+	</CommandPlacement>
+	<CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0600">
+	  <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj"/>
+	</CommandPlacement>
+  </CommandPlacements>
+
+  <!-- ═══ Symbols ══════════════════════════════════════════════════════════ -->
+  <Symbols>
+
+	<GuidSymbol name="guidCloudMatePackage" value="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"/>
+
+	<GuidSymbol name="guidCloudMateCmdSet" value="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}">
+	  <IDSymbol name="CloudMateSubMenu"            value="0x1000"/>
+	  <IDSymbol name="guidCloudMateGroup"          value="0x1100"/>
+	  <IDSymbol name="guidCloudMateGroupFolder"    value="0x1101"/>
+	  <IDSymbol name="guidCloudMateGroupProj"      value="0x1102"/>
+	  <IDSymbol name="guidCloudMateSubMenuGroup"   value="0x1200"/>
+	  <IDSymbol name="cmdidCompile"                value="0x0101"/>
+	  <IDSymbol name="cmdidCompressImages"         value="0x0102"/>
+	  <IDSymbol name="cmdidBuild"                  value="0x0103"/>
+	  <IDSymbol name="cmdidBuildAll"               value="0x0104"/>
+	  <IDSymbol name="cmdidWatch"                  value="0x0105"/>
+	</GuidSymbol>
+
+  </Symbols>
+
+</CommandTable>
