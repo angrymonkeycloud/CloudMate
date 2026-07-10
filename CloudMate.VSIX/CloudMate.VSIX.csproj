@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <RootNamespace>AngryMonkey.CloudMate.VisualStudio</RootNamespace>
-    <AssemblyName>CloudMate.VSIX</AssemblyName>
+    <AssemblyName>AngryMonkey.CloudMate.VSIX</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

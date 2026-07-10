@@ -8,13 +8,13 @@ using System.Text.Json.Nodes;
 namespace AngryMonkey.CloudMate.VisualStudio;
 
 /// <summary>
-/// Reads, mutates, and writes a CloudMate <c>.mateconfig.json</c> file for the extension's
+/// Reads, mutates, and writes a CloudMate <c>mateconfig.json</c> file for the extension's
 /// context-menu commands. Locates the owning project root (nearest <c>.csproj</c>), computes
 /// wwwroot-relative output paths, and appends <c>files</c>/<c>images</c> entries without duplicates.
 /// </summary>
 internal static class ConfigWriter
 {
-    private const string ConfigFileName = ".mateconfig.json";
+    internal const string ConfigFileName = "mateconfig.json";
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -46,23 +46,25 @@ internal static class ConfigWriter
     }
 
     /// <summary>
-    /// Returns the path to the project's <c>.mateconfig.json</c>, creating an empty scaffold on disk
-    /// when it does not already exist.
+    /// Returns the path to the project's <c>mateconfig.json</c>, or null if it does not exist.
+    /// Never creates the file — callers that need to write must use <see cref="EnsureConfigExists"/>.
     /// </summary>
-    public static string GetOrCreateConfigPath(string projectRoot)
+    public static string? GetConfigPath(string projectRoot)
+    {
+        string configPath = Path.Combine(projectRoot, ConfigFileName);
+        return File.Exists(configPath) ? configPath : null;
+    }
+
+    /// <summary>
+    /// Returns the path to the project's <c>mateconfig.json</c>, creating a minimal scaffold
+    /// on disk only when it does not already exist. Use only when the user explicitly adds an entry.
+    /// </summary>
+    public static string EnsureConfigExists(string projectRoot)
     {
         string configPath = Path.Combine(projectRoot, ConfigFileName);
 
         if (!File.Exists(configPath))
-        {
-            JsonObject scaffold = new()
-            {
-                ["files"] = new JsonArray(),
-                ["images"] = new JsonArray()
-            };
-
-            File.WriteAllText(configPath, scaffold.ToJsonString(WriteOptions));
-        }
+            File.WriteAllText(configPath, "{}\n");
 
         return configPath;
     }
@@ -86,9 +88,19 @@ internal static class ConfigWriter
         return [];
     }
 
-    /// <summary>Persists a mutated config object back to disk with indented formatting.</summary>
+    /// <summary>Persists a mutated config object back to disk with indented formatting.
+    /// Empty arrays are omitted so the file stays clean.</summary>
     private static void Save(string configPath, JsonObject root)
-        => File.WriteAllText(configPath, root.ToJsonString(WriteOptions));
+    {
+        // Remove any top-level array properties that are now empty
+        foreach (string key in root.Select(p => p.Key).ToList())
+        {
+            if (root[key] is JsonArray arr && arr.Count == 0)
+                root.Remove(key);
+        }
+
+        File.WriteAllText(configPath, root.ToJsonString(WriteOptions));
+    }
 
     /// <summary>Gets an existing array property or creates and attaches a new one.</summary>
     private static JsonArray GetOrCreateArray(JsonObject root, string propertyName)
@@ -165,12 +177,12 @@ internal static class ConfigWriter
     /// </summary>
     public static Result AddCompileFile(string projectRoot, string sourceFile)
     {
-        string configPath = GetOrCreateConfigPath(projectRoot);
+        string configPath = EnsureConfigExists(projectRoot);
 
         string sourceExtension = Path.GetExtension(sourceFile).TrimStart('.').ToLowerInvariant();
         string outputExtension = CompileOutputExtensions.TryGetValue(sourceExtension, out string? mapped)
             ? mapped
-            : sourceExtension; // keep same extension for css, js, html, txt, md, etc.
+            : sourceExtension;
 
         string relativeInput = ToRelative(projectRoot, sourceFile);
         string mappedDirectory = MapToOutput(projectRoot, GetRelativeDirectory(relativeInput));
@@ -182,7 +194,7 @@ internal static class ConfigWriter
 
         if (EntryExists(files, relativeInput, relativeOutput))
             return new Result(false, configPath, relativeInput, relativeOutput,
-                "This compile entry already exists in .mateconfig.json.");
+                "This compile entry already exists in mateconfig.json.");
 
         files.Add(new JsonObject
         {
@@ -200,11 +212,16 @@ internal static class ConfigWriter
     /// </summary>
     public static bool HasCompileFile(string projectRoot, string sourceFile)
     {
-        string configPath = GetOrCreateConfigPath(projectRoot);
+        // Never create the config just to check — if it doesn't exist the file isn't configured.
+        string? configPath = GetConfigPath(projectRoot);
+        if (configPath is null)
+            return false;
+
         string relativeInput = ToRelative(projectRoot, sourceFile);
 
         JsonObject root = Load(configPath);
-        JsonArray files = GetOrCreateArray(root, "files");
+        if (root["files"] is not JsonArray files)
+            return false;
 
         foreach (JsonNode? node in files)
         {
@@ -224,7 +241,7 @@ internal static class ConfigWriter
     /// </summary>
     public static Result RemoveCompileFile(string projectRoot, string sourceFile)
     {
-        string configPath = GetOrCreateConfigPath(projectRoot);
+        string? configPath = GetConfigPath(projectRoot);
 
         string sourceExtension = Path.GetExtension(sourceFile).TrimStart('.').ToLowerInvariant();
         string outputExtension = CompileOutputExtensions.TryGetValue(sourceExtension, out string? mapped)
@@ -236,8 +253,14 @@ internal static class ConfigWriter
         string outputFileName = $"{Path.GetFileNameWithoutExtension(sourceFile)}.{outputExtension}";
         string relativeOutput = CombineRelative(mappedDirectory, outputFileName);
 
+        if (configPath is null)
+            return new Result(false, Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
+                "This file is not configured for compilation.");
+
         JsonObject root = Load(configPath);
-        JsonArray files = GetOrCreateArray(root, "files");
+        if (root["files"] is not JsonArray files)
+            return new Result(false, configPath, relativeInput, relativeOutput,
+                "This file is not configured for compilation.");
 
         int removed = 0;
         for (int i = files.Count - 1; i >= 0; i--)
@@ -258,7 +281,7 @@ internal static class ConfigWriter
 
         Save(configPath, root);
         return new Result(true, configPath, relativeInput, relativeOutput,
-            removed == 1 ? "Removed from .mateconfig.json." : $"Removed {removed} compile entries from .mateconfig.json.");
+            removed == 1 ? "Removed from mateconfig.json." : $"Removed {removed} compile entries from mateconfig.json.");
     }
 
     // ─── Compress (images) ─────────────────────────────────────────────────────
@@ -271,7 +294,7 @@ internal static class ConfigWriter
     /// </summary>
     public static Result AddCompressFolder(string projectRoot, string sourceFolder)
     {
-        string configPath = GetOrCreateConfigPath(projectRoot);
+        string configPath = EnsureConfigExists(projectRoot);
 
         string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
         string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
@@ -282,7 +305,7 @@ internal static class ConfigWriter
 
         if (EntryExists(images, relativeInput, relativeOutput))
             return new Result(false, configPath, relativeInput, relativeOutput,
-                "This compress entry already exists in .mateconfig.json.");
+                "This compress entry already exists in mateconfig.json.");
 
         images.Add(new JsonObject
         {

@@ -92,7 +92,7 @@ public sealed class CloudMatePackage : AsyncPackage
             if (string.IsNullOrEmpty(solutionDir) || !Directory.Exists(solutionDir))
                 return;
 
-            string[] configFiles = Directory.GetFiles(solutionDir, ".mateconfig.json", SearchOption.AllDirectories);
+            string[] configFiles = Directory.GetFiles(solutionDir, ConfigWriter.ConfigFileName, SearchOption.AllDirectories);
             if (configFiles.Length == 0)
                 return;
 

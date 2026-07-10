@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.ComponentModel.Design;
+using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
@@ -66,10 +67,16 @@ internal sealed class CompileVsCommand : VsCommandBase
 
         if (!ConfigWriter.HasCompileFile(root, path!))
         {
+            bool configExistedBefore = ConfigWriter.GetConfigPath(root) is not null;
+
             ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path!);
             Log(r.Added
                 ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
                 : $"[compile] {r.Message}");
+
+            // If we just created the config file, mark it as not copied to output in the project.
+            if (!configExistedBefore)
+                SetConfigNotCopiedToOutput(root);
         }
         else
         {
@@ -79,5 +86,42 @@ internal sealed class CompileVsCommand : VsCommandBase
         Log($"> mate  [{root}]");
         RunBuild(root, new string[0]);
         EnsureAlwaysWatching(root);
+    }
+
+    /// <summary>
+    /// Finds the mateconfig.json project item and sets CopyToOutputDirectory to Never
+    /// so it is never deployed with the web application output.
+    /// </summary>
+    private void SetConfigNotCopiedToOutput(string projectRoot)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SDTE)) is not DTE dte)
+                return;
+
+            string configPath = Path.Combine(projectRoot, ConfigWriter.ConfigFileName);
+
+            foreach (Project project in dte.Solution.Projects)
+            {
+                foreach (ProjectItem item in project.ProjectItems)
+                {
+                    try
+                    {
+                        string? itemPath = item.FileNames[1];
+                        if (itemPath is not null &&
+                            string.Equals(itemPath.TrimEnd('\\', '/'), configPath.TrimEnd('\\', '/'),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            item.Properties.Item("CopyToOutputDirectory").Value = 0; // Never
+                            return;
+                        }
+                    }
+                    catch { /* property may not exist on all item types */ }
+                }
+            }
+        }
+        catch { /* best-effort: don't break compilation if DTE walk fails */ }
     }
 }

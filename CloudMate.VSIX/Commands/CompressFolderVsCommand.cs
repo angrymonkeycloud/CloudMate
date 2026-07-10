@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using System.ComponentModel.Design;
+using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
@@ -57,13 +58,54 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
             return;
         }
 
+        bool configExistedBefore = ConfigWriter.GetConfigPath(root) is not null;
+
         ConfigWriter.Result r = ConfigWriter.AddCompressFolder(root, folderPath);
         Log(r.Added
             ? $"[compress] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
             : $"[compress] {r.Message}");
 
+        if (!configExistedBefore)
+            SetConfigNotCopiedToOutput(root);
+
         Log($"> mate  [{root}]");
         RunBuild(root, new string[0]);
         EnsureAlwaysWatching(root);
+    }
+
+    /// <summary>
+    /// Sets CopyToOutputDirectory = Never on the mateconfig.json project item.
+    /// </summary>
+    private void SetConfigNotCopiedToOutput(string projectRoot)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SDTE)) is not DTE dte)
+                return;
+
+            string configPath = Path.Combine(projectRoot, ConfigWriter.ConfigFileName);
+
+            foreach (Project project in dte.Solution.Projects)
+            {
+                foreach (ProjectItem item in project.ProjectItems)
+                {
+                    try
+                    {
+                        string? itemPath = item.FileNames[1];
+                        if (itemPath is not null &&
+                            string.Equals(itemPath.TrimEnd('\\', '/'), configPath.TrimEnd('\\', '/'),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            item.Properties.Item("CopyToOutputDirectory").Value = 0; // Never
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
     }
 }

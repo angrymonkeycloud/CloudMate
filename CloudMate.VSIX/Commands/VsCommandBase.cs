@@ -40,7 +40,7 @@ internal abstract class VsCommandBase
     // --- Selection via DTE ---------------------------------------------------
 
     /// <summary>The CloudMate configuration file name.</summary>
-    protected const string ConfigFileName = ".mateconfig.json";
+    protected const string ConfigFileName = ConfigWriter.ConfigFileName;
 
     /// <summary>
     /// Static web-asset extensions CloudMate can compile / bundle.
@@ -149,6 +149,11 @@ internal abstract class VsCommandBase
 
     protected void EnsureAlwaysWatching(string workingDirectory)
     {
+        // Only start watch if the config file actually exists —
+        // never watch a directory where mateconfig.json hasn't been created yet.
+        if (!File.Exists(Path.Combine(workingDirectory, ConfigWriter.ConfigFileName)))
+            return;
+
         AsyncPackage package = Package;
         try
         {
