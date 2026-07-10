@@ -20,16 +20,22 @@
   <Commands package="guidCloudMatePackage">
 
     <!--
-      Icons come from Resources\CloudMate.imagemanifest (separate high-resolution
-      PNGs, one per command). No bitmap strip is used anymore.
+      Icons: one separate PNG per command, compiled into the menu resource.
+      Each Bitmap has its own guid and a single image slot (usedList="1").
     -->
+    <Bitmaps>
+      <Bitmap guid="guidIconCloudMate" href="Resources\CloudMate16.png" usedList="1"/>
+      <Bitmap guid="guidIconCompile"   href="Resources\Compile16.png"   usedList="1"/>
+      <Bitmap guid="guidIconStop"      href="Resources\Stop16.png"      usedList="1"/>
+      <Bitmap guid="guidIconCompress"  href="Resources\Compress16.png"  usedList="1"/>
+      <Bitmap guid="guidIconRebuild"   href="Resources\Rebuild16.png"   usedList="1"/>
+    </Bitmaps>
 
     <!-- Menus -->
     <Menus>
       <Menu guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100" type="Menu">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroup"/>
-        <Icon guid="guidCommandIcons" id="iconCloudMate"/>
-        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Icon guid="guidIconCloudMate" id="1"/>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <Strings>
           <ButtonText>CloudMate</ButtonText>
@@ -59,8 +65,7 @@
 
       <Button guid="guidCloudMateCmdSet" id="cmdidCompile" priority="0x0100" type="Button">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidCommandIcons" id="iconCompile"/>
-        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Icon guid="guidIconCompile" id="1"/>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <CommandFlag>DefaultInvisible</CommandFlag>
         <CommandFlag>TextChanges</CommandFlag>
@@ -72,8 +77,7 @@
 
       <Button guid="guidCloudMateCmdSet" id="cmdidStopCompiling" priority="0x0150" type="Button">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidCommandIcons" id="iconStop"/>
-        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Icon guid="guidIconStop" id="1"/>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <CommandFlag>DefaultInvisible</CommandFlag>
         <Strings>
@@ -84,8 +88,7 @@
 
       <Button guid="guidCloudMateCmdSet" id="cmdidCompressImages" priority="0x0200" type="Button">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidCommandIcons" id="iconCompress"/>
-        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Icon guid="guidIconCompress" id="1"/>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <CommandFlag>DefaultInvisible</CommandFlag>
         <Strings>
@@ -96,8 +99,7 @@
 
       <Button guid="guidCloudMateCmdSet" id="cmdidBuild" priority="0x0300" type="Button">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidCommandIcons" id="iconRebuild"/>
-        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Icon guid="guidIconRebuild" id="1"/>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <CommandFlag>DefaultInvisible</CommandFlag>
         <Strings>
@@ -139,13 +141,11 @@
       <IDSymbol name="cmdidWatch"                value="0x0105"/>
     </GuidSymbol>
 
-    <GuidSymbol name="guidCommandIcons" value="{C3D4E5F6-A7B8-9012-CDEF-123456789012}">
-      <IDSymbol name="iconCloudMate"  value="1"/>
-      <IDSymbol name="iconCompile"    value="2"/>
-      <IDSymbol name="iconStop"       value="3"/>
-      <IDSymbol name="iconCompress"   value="4"/>
-      <IDSymbol name="iconRebuild"    value="5"/>
-    </GuidSymbol>
+    <GuidSymbol name="guidIconCloudMate" value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
+    <GuidSymbol name="guidIconCompile"   value="{E5F6A7B8-C9D0-1234-EF12-345678901234}"/>
+    <GuidSymbol name="guidIconStop"      value="{F6A7B8C9-D0E1-2345-F123-456789012345}"/>
+    <GuidSymbol name="guidIconCompress"  value="{A7B8C9D0-E1F2-3456-1234-567890123456}"/>
+    <GuidSymbol name="guidIconRebuild"   value="{B8C9D0E1-F2A3-4567-2345-678901234567}"/>
 
   </Symbols>
 
