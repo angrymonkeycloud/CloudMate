@@ -56,6 +56,11 @@
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- README shown on Visual Studio Marketplace extension page -->
+    <Content Include="README.md">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <!-- Per-command icons: 16px versions are compiled into the VSCT menu resource;
          32px masters kept for future high-DPI use -->
     <VSCTCompile Include="CloudMatePackage.vsct">

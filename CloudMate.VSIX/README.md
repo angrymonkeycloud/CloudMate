@@ -1,10 +1,17 @@
-# CloudMate Visual Studio Extension
+# CloudMate for Visual Studio
 
-Integrates the [CloudMate](https://github.com/angrymonkeycloud/CloudMate) asset bundling CLI into Visual Studio 2026.
+CloudMate integrates the `mate` CLI into Visual Studio for .NET solutions that include front-end/static assets.
+
+- Website: https://angrymonkeycloud.com/cloudmate
+- GitHub: https://github.com/angrymonkeycloud/CloudMate
+
+## Best Use
+
+CloudMate is best used in **.NET projects** where TypeScript/CSS pipelines and image optimization are managed alongside C# code.
 
 ## Prerequisites
 
-Install the `mate` dotnet CLI tool globally:
+Install the CloudMate CLI globally:
 
 ```bash
 dotnet tool install -g AngryMonkey.CloudMate.CLI
@@ -12,37 +19,36 @@ dotnet tool install -g AngryMonkey.CloudMate.CLI
 
 ## Features
 
-- **Build** — runs `mate` (dev build) in the solution directory
-- **Build All** — runs `mate --all` (all defined builds)  
-- **Watch / Stop Watch** — toggles `mate --watch` mode; rebuilds automatically on `.ts`, `.less`, `.scss`, `.sass`, `.css`, `.js` changes
-- **Auto-rebuild on save** — when Watch is active, any change to a supported file triggers a rebuild
+- Compile and bundle static assets (`.ts`, `.js`, `.css`, `.less`, `.scss`, `.sass`)
+- Configure folder-based image compression via `.mateconfig.json`
+- Rebuild from config and run always-on watch behavior from Visual Studio
+- Context menu integration in Solution Explorer
 
-## Context Menus
+## Context Menu Behavior
 
-Right-click in Solution Explorer on:
-- `.ts`, `.less`, `.scss`, `.sass`, `.css`, `.js` files
-- `.mateconfig`, `.mateconfig.json`, `.mateconfig.yaml`, `mateconfig.json` config files
-- Project nodes
-- Folders
+CloudMate commands are context-aware:
 
-## Output Window
+- **Supported compile files** (`.ts`, `.js`, `.css`, `.less`, `.scss`, `.sass`)
+  - **Compile**
+  - **Recompile** + **Stop Compiling** when already configured
+- **Folders**
+  - **Compress** only
+- **`.mateconfig.json`**
+  - **Rebuild** only
+- **Unsupported files / images**
+  - No active CloudMate commands
 
-All `mate` output is streamed to the **CloudMate** pane in the Output window.
+## Updating Configuration
 
-## Tools Menu
+CloudMate writes configuration to `.mateconfig.json` at the project root.
 
-Commands are also available under **Tools › CloudMate**.
+Typical flow:
+1. Right-click a supported file and choose **CloudMate > Compile**.
+2. Right-click a folder and choose **CloudMate > Compress**.
+3. Right-click `.mateconfig.json` and choose **CloudMate > Rebuild**.
 
-## Configuration
+To stop a file from compilation, right-click it and choose **CloudMate > Stop Compiling**.
 
-A **Tools › Options › CloudMate** page lets you configure:
+## Output
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| Mate Path | `mate` | Path to the `mate` executable (useful if not on PATH) |
-
-## Getting Started
-
-1. Build and install the VSIX from `CloudMate.VSIX/` (`dotnet build` or open in VS and press F5).
-2. Open a solution that contains a `.mateconfig` (or similar) file.
-3. Right-click any `.ts`, `.less`, `.scss`, or other supported file and select **CloudMate › Build**.
+All CloudMate output is written to the **CloudMate** pane in the Visual Studio Output window.
