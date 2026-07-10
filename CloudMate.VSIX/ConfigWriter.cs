@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Xml.Linq;
 
 namespace AngryMonkey.CloudMate.VisualStudio;
 
@@ -66,6 +67,7 @@ internal static class ConfigWriter
         if (!File.Exists(configPath))
             File.WriteAllText(configPath, "{}\n");
 
+        EnsureConfigProjectMetadata(projectRoot);
         return configPath;
     }
 
@@ -111,6 +113,76 @@ internal static class ConfigWriter
         JsonArray created = [];
         root[propertyName] = created;
         return created;
+    }
+
+    // ─── Project metadata (Build Action / Copy settings) ─────────────────────
+
+    private static void EnsureConfigProjectMetadata(string projectRoot)
+    {
+        try
+        {
+            string? csprojPath = Directory.EnumerateFiles(projectRoot, "*.csproj", SearchOption.TopDirectoryOnly)
+                .FirstOrDefault();
+            if (string.IsNullOrEmpty(csprojPath) || !File.Exists(csprojPath))
+                return;
+
+            XDocument doc = XDocument.Load(csprojPath, LoadOptions.PreserveWhitespace);
+            XElement? project = doc.Root;
+            if (project is null)
+                return;
+
+            XNamespace ns = project.Name.Namespace;
+
+            // Ensure: <Content Remove="mateconfig.json" />
+            bool hasContentRemove = project.Elements(ns + "ItemGroup")
+                .Elements(ns + "Content")
+                .Any(e => string.Equals((string?)e.Attribute("Remove"), ConfigFileName, StringComparison.OrdinalIgnoreCase));
+
+            // Ensure: <None Include="mateconfig.json"> ... Never ... </None>
+            XElement? noneItem = project.Elements(ns + "ItemGroup")
+                .Elements(ns + "None")
+                .FirstOrDefault(e =>
+                    string.Equals((string?)e.Attribute("Include"), ConfigFileName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals((string?)e.Attribute("Update"), ConfigFileName, StringComparison.OrdinalIgnoreCase));
+
+            XElement? targetGroup = project.Elements(ns + "ItemGroup").LastOrDefault();
+            if (targetGroup is null)
+            {
+                targetGroup = new XElement(ns + "ItemGroup");
+                project.Add(targetGroup);
+            }
+
+            if (!hasContentRemove)
+                targetGroup.Add(new XElement(ns + "Content", new XAttribute("Remove", ConfigFileName)));
+
+            if (noneItem is null)
+            {
+                noneItem = new XElement(ns + "None", new XAttribute("Include", ConfigFileName));
+                targetGroup.Add(noneItem);
+            }
+
+            // Normalize to explicit include-based None item.
+            noneItem.SetAttributeValue("Update", null);
+            noneItem.SetAttributeValue("Include", ConfigFileName);
+
+            SetOrCreateElementValue(noneItem, ns + "CopyToOutputDirectory", "Never");
+            SetOrCreateElementValue(noneItem, ns + "CopyToPublishDirectory", "Never");
+
+            doc.Save(csprojPath);
+        }
+        catch
+        {
+            // Best effort: failure here should never block command execution.
+        }
+    }
+
+    private static void SetOrCreateElementValue(XElement parent, XName name, string value)
+    {
+        XElement? child = parent.Element(name);
+        if (child is null)
+            parent.Add(new XElement(name, value));
+        else
+            child.Value = value;
     }
 
     // ─── Path helpers ──────────────────────────────────────────────────────────

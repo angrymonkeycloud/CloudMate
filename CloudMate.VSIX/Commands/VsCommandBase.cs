@@ -125,6 +125,69 @@ internal abstract class VsCommandBase
         return SelectionKind.None;
     }
 
+    // --- Config project-item properties ---------------------------------------
+
+    /// <summary>
+    /// Ensures the mateconfig.json project item has Build Action = None and
+    /// CopyToOutputDirectory = Do not copy, so it is never built or deployed
+    /// with the application output. Safe to call repeatedly; best-effort.
+    /// </summary>
+    protected static void EnsureConfigItemProperties(string projectRoot)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SDTE)) is not DTE dte)
+                return;
+
+            string configPath = Path.Combine(projectRoot, ConfigWriter.ConfigFileName);
+
+            foreach (Project project in dte.Solution.Projects)
+            {
+                ProjectItem? item = FindItemByPath(project.ProjectItems, configPath);
+                if (item is null)
+                    continue;
+
+                TrySetProperty(item, "ItemType", "None");            // Build Action: None
+                TrySetProperty(item, "CopyToOutputDirectory", 0);    // Do not copy
+                return;
+            }
+        }
+        catch { /* best-effort: never break the user command over project-item metadata */ }
+    }
+
+    private static ProjectItem? FindItemByPath(ProjectItems? items, string fullPath)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (items is null)
+            return null;
+
+        foreach (ProjectItem item in items)
+        {
+            string? itemPath = null;
+            try { itemPath = item.FileNames[1]; } catch { }
+
+            if (itemPath is not null &&
+                string.Equals(itemPath.TrimEnd('\\', '/'), fullPath.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                return item;
+
+            ProjectItem? nested = FindItemByPath(item.ProjectItems, fullPath);
+            if (nested is not null)
+                return nested;
+        }
+
+        return null;
+    }
+
+    private static void TrySetProperty(ProjectItem item, string propertyName, object value)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        try { item.Properties.Item(propertyName).Value = value; }
+        catch { /* property not present on this project type */ }
+    }
+
     // --- Build / Watch --------------------------------------------------------
 
     protected void RunBuild(string workingDirectory, string[] args)
