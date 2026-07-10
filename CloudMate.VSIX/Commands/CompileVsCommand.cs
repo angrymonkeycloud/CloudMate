@@ -25,7 +25,12 @@ internal sealed class CompileVsCommand : VsCommandBase
         svc.AddCommand(cmd);
     }
 
-    /// <summary>Compile applies to any file except the config file itself.</summary>
+    /// <summary>
+    /// Compile/Recompile appears only for compile-eligible files (never folders/config/images).
+    /// Text changes dynamically:
+    /// - Compile: file is not yet in .mateconfig.json
+    /// - Recompile: file already exists in .mateconfig.json
+    /// </summary>
     private void QueryStatus(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
@@ -34,9 +39,14 @@ internal sealed class CompileVsCommand : VsCommandBase
             return;
 
         string? selectedPath = GetSelectedPath();
-        cmd.Visible = selectedPath is not null
-            && File.Exists(selectedPath)
-            && !string.Equals(Path.GetFileName(selectedPath), ConfigFileName, StringComparison.OrdinalIgnoreCase);
+        cmd.Visible = IsCompileEligibleFile(selectedPath);
+
+        if (!cmd.Visible || string.IsNullOrEmpty(selectedPath))
+            return;
+
+        string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
+        bool inConfig = projectRoot is not null && ConfigWriter.HasCompileFile(projectRoot, selectedPath!);
+        cmd.Text = inConfig ? "Recompile" : "Compile";
     }
 
     private void Execute(object sender, EventArgs e)
@@ -45,9 +55,9 @@ internal sealed class CompileVsCommand : VsCommandBase
 
         string? selectedPath = GetSelectedPath();
 
-        if (string.IsNullOrEmpty(selectedPath) || !File.Exists(selectedPath))
+        if (!IsCompileEligibleFile(selectedPath))
         {
-            Log("[CloudMate] Compile: please select a file in Solution Explorer.");
+            Log("[CloudMate] Compile: please select a supported static file (not config/image/folder).");
             return;
         }
 
@@ -58,14 +68,21 @@ internal sealed class CompileVsCommand : VsCommandBase
             return;
         }
 
-        ConfigWriter.Result result = ConfigWriter.AddCompileFile(projectRoot, selectedPath!);
-        Log(result.Added
-            ? $"[compile] {result.Input} -> {result.Output}  (added to {Path.GetFileName(result.ConfigPath)})"
-            : $"[compile] {result.Message}");
+        bool inConfig = ConfigWriter.HasCompileFile(projectRoot, selectedPath!);
+        if (!inConfig)
+        {
+            ConfigWriter.Result result = ConfigWriter.AddCompileFile(projectRoot, selectedPath!);
+            Log(result.Added
+                ? $"[compile] {result.Input} -> {result.Output}  (added to {Path.GetFileName(result.ConfigPath)})"
+                : $"[compile] {result.Message}");
+        }
+        else
+        {
+            Log($"[recompile] {Path.GetFileName(selectedPath)} is already configured. Running one-time rebuild.");
+        }
 
-        // Always build after touching the config so the output (e.g. .css) is produced
-        // immediately, whether the entry was newly added or already present.
         Log($"> mate  [{projectRoot}]");
         RunBuild(projectRoot, new string[0]);
+        EnsureAlwaysWatching(projectRoot);
     }
 }

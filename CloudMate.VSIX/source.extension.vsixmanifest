@@ -2,8 +2,8 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
 				 xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-	<Identity Id="CloudMate.VSIX" Version="1.0.4" Language="en-US"
-			  Publisher="AngryMonkey" />
+	<Identity Id="CloudMate.VSIX" Version="1.0.5" Language="en-US"
+			  Publisher="Angry Monkey" />
 	<DisplayName>CloudMate</DisplayName>
 	<Description xml:space="preserve">
 	  Compile, bundle, compress, and watch web assets (TypeScript, LESS, SCSS, CSS, JS) using
@@ -11,7 +11,7 @@
 	  feature that rebuilds on every supported file change.
 	</Description>
 	<MoreInfo>https://github.com/angrymonkeycloud/CloudMate</MoreInfo>
-	<Icon>amc-logo.png</Icon>
+	<Icon>amc-logo-200x200.png</Icon>
 	<Tags>typescript less scss sass css bundler minifier cloudmate</Tags>
   </Metadata>
   <Installation>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -89,7 +90,44 @@ internal abstract class VsCommandBase
             && string.Equals(Path.GetFileName(path), ConfigFileName, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ─── Build ─────────────────────────────────────────────────────────────────────────
+    protected static bool IsSelectedFolder()
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        string? path = GetSelectedPath();
+        return path is not null && Directory.Exists(path);
+    }
+
+    protected static bool IsSelectedFile()
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        string? path = GetSelectedPath();
+        return path is not null && File.Exists(path);
+    }
+
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif", ".avif"
+    };
+
+    /// <summary>
+    /// Returns true for files that should expose compile actions:
+    /// - existing file
+    /// - not .mateconfig.json
+    /// - not an image file (including .svg)
+    /// </summary>
+    protected static bool IsCompileEligibleFile(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return false;
+
+        if (string.Equals(Path.GetFileName(path), ConfigFileName, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string ext = Path.GetExtension(path);
+        return !ImageExtensions.Contains(ext);
+    }
+
+    // ─── Build / Watch ─────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Runs <c>mate [args]</c> in <paramref name="workingDirectory"/> on a background thread,
@@ -114,5 +152,25 @@ internal abstract class VsCommandBase
                 CloudMatePackage.OutputLine(package, $"[CloudMate] {ex.Message}");
             }
         });
+    }
+
+    /// <summary>
+    /// Ensures an always-on watch process is running for <paramref name="workingDirectory"/>.
+    /// If watch crashes/stops unexpectedly, MateRunner will auto-restart it.
+    /// </summary>
+    protected void EnsureAlwaysWatching(string workingDirectory)
+    {
+        AsyncPackage package = Package;
+        try
+        {
+            MateRunner.EnsureWatch(
+                workingDirectory,
+                line => CloudMatePackage.OutputLine(package, line),
+                line => CloudMatePackage.OutputLine(package, line));
+        }
+        catch (FileNotFoundException ex)
+        {
+            CloudMatePackage.OutputLine(package, $"[CloudMate] {ex.Message}");
+        }
     }
 }

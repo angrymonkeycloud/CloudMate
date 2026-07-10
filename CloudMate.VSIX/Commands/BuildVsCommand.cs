@@ -25,12 +25,16 @@ internal sealed class BuildVsCommand : VsCommandBase
         svc.AddCommand(cmd);
     }
 
-    /// <summary>Build is only offered on the .mateconfig.json file.</summary>
+    /// <summary>Rebuild is only offered on the .mateconfig.json file.</summary>
     private void QueryStatus(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
-        if (sender is OleMenuCommand cmd)
-            cmd.Visible = IsConfigFileSelected();
+
+        if (sender is not OleMenuCommand cmd)
+            return;
+
+        cmd.Visible = IsConfigFileSelected();
+        cmd.Text = "Rebuild";
     }
 
     private void Execute(object sender, EventArgs e)
@@ -42,11 +46,12 @@ internal sealed class BuildVsCommand : VsCommandBase
 
         if (workingDir is null)
         {
-            Log("[CloudMate] Build: please select a .mateconfig.json inside a project.");
+            Log("[CloudMate] Rebuild: please select a .mateconfig.json inside a project.");
             return;
         }
 
         Log($"> mate  [{workingDir}]");
         RunBuild(workingDir, new string[0]);
+        EnsureAlwaysWatching(workingDir);
     }
 }

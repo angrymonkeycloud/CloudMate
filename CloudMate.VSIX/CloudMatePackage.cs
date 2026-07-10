@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using EnvDTE;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -28,10 +30,11 @@ public sealed class CloudMatePackage : AsyncPackage
         await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
         await Commands.CompileVsCommand.InitializeAsync(this);
+        await Commands.StopCompilingVsCommand.InitializeAsync(this);
         await Commands.CompressFolderVsCommand.InitializeAsync(this);
         await Commands.BuildVsCommand.InitializeAsync(this);
-        await Commands.BuildAllVsCommand.InitializeAsync(this);
-        await Commands.WatchVsCommand.InitializeAsync(this);
+
+        BootstrapAlwaysOnWatch();
     }
 
     // ─── Output pane ─────────────────────────────────────────────────────────
@@ -61,5 +64,47 @@ public sealed class CloudMatePackage : AsyncPackage
             _outputPane?.OutputStringThreadSafe(message + Environment.NewLine);
             _outputPane?.Activate();
         });
+    }
+
+    /// <summary>
+    /// Starts always-on watch once package loads, using the first discovered .mateconfig.json
+    /// under the open solution. Watch self-heals in MateRunner if the process exits.
+    /// </summary>
+    private void BootstrapAlwaysOnWatch()
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (GetService(typeof(SDTE)) is not DTE dte)
+                return;
+
+            string solutionPath = dte.Solution?.FullName ?? string.Empty;
+            if (string.IsNullOrEmpty(solutionPath))
+                return;
+
+            string solutionDir = Path.GetDirectoryName(solutionPath) ?? string.Empty;
+            if (string.IsNullOrEmpty(solutionDir) || !Directory.Exists(solutionDir))
+                return;
+
+            string[] configFiles = Directory.GetFiles(solutionDir, ".mateconfig.json", SearchOption.AllDirectories);
+            if (configFiles.Length == 0)
+                return;
+
+            string watchDir = Path.GetDirectoryName(configFiles[0]) ?? string.Empty;
+            if (string.IsNullOrEmpty(watchDir))
+                return;
+
+            MateRunner.EnsureWatch(
+                watchDir,
+                line => OutputLine(this, line),
+                line => OutputLine(this, line));
+
+            OutputLine(this, $"[CloudMate] always-on watch enabled in '{watchDir}'.");
+        }
+        catch (Exception ex)
+        {
+            OutputLine(this, $"[CloudMate] watch bootstrap skipped: {ex.Message}");
+        }
     }
 }

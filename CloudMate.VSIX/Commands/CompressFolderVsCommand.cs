@@ -20,7 +20,19 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
 
         var instance = new CompressFolderVsCommand(package);
         var svc = GetCommandService(package);
-        svc.AddCommand(new OleMenuCommand(instance.Execute, new CommandID(CmdSetGuid, CmdId)));
+        var cmd = new OleMenuCommand(instance.Execute, new CommandID(CmdSetGuid, CmdId));
+        cmd.BeforeQueryStatus += instance.QueryStatus;
+        svc.AddCommand(cmd);
+    }
+
+    private void QueryStatus(object sender, EventArgs e)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (sender is not OleMenuCommand cmd)
+            return;
+
+        cmd.Visible = IsSelectedFolder();
     }
 
     private void Execute(object sender, EventArgs e)
@@ -31,14 +43,14 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
 
         if (string.IsNullOrEmpty(selectedPath) || !Directory.Exists(selectedPath))
         {
-            Log("[CloudMate] Compress Images: please select a folder in Solution Explorer.");
+            Log("[CloudMate] Compress: please select a folder in Solution Explorer.");
             return;
         }
 
         string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
         if (projectRoot is null)
         {
-            Log($"[CloudMate] Compress Images: could not find a .csproj for the selected folder.");
+            Log($"[CloudMate] Compress: could not find a .csproj for the selected folder.");
             return;
         }
 
@@ -47,8 +59,8 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
             ? $"[compress] {result.Input} -> {result.Output}  (added to {Path.GetFileName(result.ConfigPath)})"
             : $"[compress] {result.Message}");
 
-        // Always build after touching the config so compressed output is produced immediately.
         Log($"> mate  [{projectRoot}]");
         RunBuild(projectRoot, new string[0]);
+        EnsureAlwaysWatching(projectRoot);
     }
 }

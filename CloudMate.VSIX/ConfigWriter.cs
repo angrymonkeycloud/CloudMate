@@ -194,6 +194,73 @@ internal static class ConfigWriter
         return new Result(true, configPath, relativeInput, relativeOutput);
     }
 
+    /// <summary>
+    /// Returns whether <paramref name="sourceFile"/> already exists in <c>files</c> input entries
+    /// of the project's <c>.mateconfig.json</c>.
+    /// </summary>
+    public static bool HasCompileFile(string projectRoot, string sourceFile)
+    {
+        string configPath = GetOrCreateConfigPath(projectRoot);
+        string relativeInput = ToRelative(projectRoot, sourceFile);
+
+        JsonObject root = Load(configPath);
+        JsonArray files = GetOrCreateArray(root, "files");
+
+        foreach (JsonNode? node in files)
+        {
+            if (node is not JsonObject entry)
+                continue;
+
+            if (ValueEquals(entry["input"], relativeInput))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Removes all compile entries whose <c>input</c> matches <paramref name="sourceFile"/>.
+    /// Returns a result indicating whether anything was removed.
+    /// </summary>
+    public static Result RemoveCompileFile(string projectRoot, string sourceFile)
+    {
+        string configPath = GetOrCreateConfigPath(projectRoot);
+
+        string sourceExtension = Path.GetExtension(sourceFile).TrimStart('.').ToLowerInvariant();
+        string outputExtension = CompileOutputExtensions.TryGetValue(sourceExtension, out string? mapped)
+            ? mapped
+            : sourceExtension;
+
+        string relativeInput = ToRelative(projectRoot, sourceFile);
+        string mappedDirectory = MapToOutput(projectRoot, GetRelativeDirectory(relativeInput));
+        string outputFileName = $"{Path.GetFileNameWithoutExtension(sourceFile)}.{outputExtension}";
+        string relativeOutput = CombineRelative(mappedDirectory, outputFileName);
+
+        JsonObject root = Load(configPath);
+        JsonArray files = GetOrCreateArray(root, "files");
+
+        int removed = 0;
+        for (int i = files.Count - 1; i >= 0; i--)
+        {
+            if (files[i] is not JsonObject entry)
+                continue;
+
+            if (ValueEquals(entry["input"], relativeInput))
+            {
+                files.RemoveAt(i);
+                removed++;
+            }
+        }
+
+        if (removed == 0)
+            return new Result(false, configPath, relativeInput, relativeOutput,
+                "This file is not configured for compilation.");
+
+        Save(configPath, root);
+        return new Result(true, configPath, relativeInput, relativeOutput,
+            removed == 1 ? "Removed from .mateconfig.json." : $"Removed {removed} compile entries from .mateconfig.json.");
+    }
+
     // ─── Compress (images) ─────────────────────────────────────────────────────
 
     /// <summary>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace AngryMonkey.CloudMate.VisualStudio;
 
@@ -12,6 +13,10 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 internal static class MateRunner
 {
     private static Process? _watchProcess;
+    private static string? _watchWorkingDirectory;
+    private static Action<string>? _watchOutput;
+    private static Action<string>? _watchError;
+    private static bool _watchStopRequested;
     private static readonly object _watchLock = new();
 
     public static bool IsWatching
@@ -20,6 +25,38 @@ internal static class MateRunner
         {
             lock (_watchLock)
                 return _watchProcess is { HasExited: false };
+        }
+    }
+
+    /// <summary>
+    /// Ensures a resilient watch process is running for the supplied working directory.
+    /// If watch exits unexpectedly it is restarted automatically.
+    /// </summary>
+    public static void EnsureWatch(string workingDirectory, Action<string> output, Action<string> error)
+    {
+        lock (_watchLock)
+        {
+            _watchWorkingDirectory = workingDirectory;
+            _watchOutput = output;
+            _watchError = error;
+
+            if (_watchProcess is { HasExited: false }
+                && string.Equals(_watchProcess.StartInfo.WorkingDirectory, workingDirectory, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (_watchProcess is { HasExited: false })
+            {
+                _watchStopRequested = true;
+                try { _watchProcess.Kill(); } catch { }
+                finally
+                {
+                    _watchProcess.Dispose();
+                    _watchProcess = null;
+                }
+            }
+
+            _watchStopRequested = false;
+            StartWatchInternal();
         }
     }
 
@@ -44,25 +81,72 @@ internal static class MateRunner
             error($"[CloudMate] mate exited with code {proc.ExitCode}.");
     }
 
-    /// <summary>Starts <c>mate --watch</c> in the background. Returns immediately; call <see cref="StopWatch"/> to terminate.</summary>
+    /// <summary>Starts <c>mate --watch</c> in the background. Kept for backward compatibility; delegates to EnsureWatch.</summary>
     public static void StartWatch(string workingDirectory, Action<string> output, Action<string> error)
+        => EnsureWatch(workingDirectory, output, error);
+
+    private static void StartWatchInternal()
+    {
+        if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
+            return;
+
+        string watchDirectory = _watchWorkingDirectory!;
+        string exe = FindMate();
+        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch" }, watchDirectory);
+
+        Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
+        proc.OutputDataReceived += (_, e) => { if (e.Data is not null) _watchOutput(e.Data); };
+        proc.ErrorDataReceived  += (_, e) => { if (e.Data is not null) _watchError(e.Data); };
+        proc.Exited += (_, _) => OnWatchExited();
+
+        proc.Start();
+        proc.BeginOutputReadLine();
+        proc.BeginErrorReadLine();
+
+        _watchOutput($"[CloudMate] watch started in '{_watchWorkingDirectory}'.");
+        _watchProcess = proc;
+    }
+
+    private static void OnWatchExited()
     {
         lock (_watchLock)
         {
-            if (_watchProcess is { HasExited: false })
+            _watchProcess?.Dispose();
+            _watchProcess = null;
+
+            if (_watchStopRequested)
                 return;
 
-            string exe = FindMate();
+            if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
+                return;
 
-            ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch" }, workingDirectory);
+            _watchError("[CloudMate] watch exited unexpectedly. restarting...");
 
-            _watchProcess = new Process { StartInfo = psi };
-            _watchProcess.OutputDataReceived += (_, e) => { if (e.Data is not null) output(e.Data); };
-            _watchProcess.ErrorDataReceived  += (_, e) => { if (e.Data is not null) error(e.Data); };
+            try
+            {
+                StartWatchInternal();
+            }
+            catch (Exception ex)
+            {
+                _watchError($"[CloudMate] watch restart failed: {ex.Message}");
 
-            _watchProcess.Start();
-            _watchProcess.BeginOutputReadLine();
-            _watchProcess.BeginErrorReadLine();
+                // Retry quickly; this keeps watch self-healing and near-instant on transient failures.
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(500);
+                    lock (_watchLock)
+                    {
+                        if (!_watchStopRequested && _watchProcess is null)
+                        {
+                            try { StartWatchInternal(); }
+                            catch (Exception retryEx)
+                            {
+                                _watchError($"[CloudMate] watch restart failed again: {retryEx.Message}");
+                            }
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -71,6 +155,8 @@ internal static class MateRunner
     {
         lock (_watchLock)
         {
+            _watchStopRequested = true;
+
             if (_watchProcess is null)
                 return;
 
