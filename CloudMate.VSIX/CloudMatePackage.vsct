@@ -36,6 +36,7 @@
       <Menu guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100" type="Menu">
         <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroup"/>
         <Icon guid="guidIconCloudMate" id="1"/>
+        <CommandFlag>IconAndText</CommandFlag>
         <CommandFlag>DynamicVisibility</CommandFlag>
         <Strings>
           <ButtonText>CloudMate</ButtonText>
@@ -137,8 +138,6 @@
       <IDSymbol name="cmdidStopCompiling"        value="0x0106"/>
       <IDSymbol name="cmdidCompressImages"       value="0x0102"/>
       <IDSymbol name="cmdidBuild"                value="0x0103"/>
-      <IDSymbol name="cmdidBuildAll"             value="0x0104"/>
-      <IDSymbol name="cmdidWatch"                value="0x0105"/>
     </GuidSymbol>
 
     <GuidSymbol name="guidIconCloudMate" value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
