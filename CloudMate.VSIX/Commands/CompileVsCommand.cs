@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.ComponentModel.Design;
@@ -6,7 +6,11 @@ using Microsoft.VisualStudio.Shell;
 
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
 
-/// <summary>Adds the selected file to .mateconfig.json as a compile entry.</summary>
+/// <summary>
+/// Adds the selected file to .mateconfig.json as a compile entry.
+/// Visible only for CompileFile selections (non-image, non-config files).
+/// Text is "Compile" when not yet configured, "Recompile" when already in config.
+/// </summary>
 internal sealed class CompileVsCommand : VsCommandBase
 {
     private static readonly Guid CmdSetGuid = new("B2C3D4E5-F6A7-8901-BCDE-F12345678901");
@@ -17,7 +21,6 @@ internal sealed class CompileVsCommand : VsCommandBase
     public static async Task InitializeAsync(AsyncPackage package)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
-
         var instance = new CompileVsCommand(package);
         var svc = GetCommandService(package);
         var cmd = new OleMenuCommand(instance.Execute, new CommandID(CmdSetGuid, CmdId));
@@ -25,64 +28,56 @@ internal sealed class CompileVsCommand : VsCommandBase
         svc.AddCommand(cmd);
     }
 
-    /// <summary>
-    /// Compile/Recompile appears only for compile-eligible files (never folders/config/images).
-    /// Text changes dynamically:
-    /// - Compile: file is not yet in .mateconfig.json
-    /// - Recompile: file already exists in .mateconfig.json
-    /// </summary>
     private void QueryStatus(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
+        if (sender is not OleMenuCommand cmd) return;
 
-        if (sender is not OleMenuCommand cmd)
+        // Only show for ordinary compile-eligible files
+        if (GetSelectionKind() != SelectionKind.CompileFile)
+        {
+            cmd.Visible = false;
             return;
+        }
 
-        string? selectedPath = GetSelectedPath();
-        cmd.Visible = IsCompileEligibleFile(selectedPath);
-
-        if (!cmd.Visible || string.IsNullOrEmpty(selectedPath))
-            return;
-
-        string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
-        bool inConfig = projectRoot is not null && ConfigWriter.HasCompileFile(projectRoot, selectedPath!);
-        cmd.Text = inConfig ? "Recompile" : "Compile";
+        cmd.Visible = true;
+        string? path = GetSelectedPath();
+        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+        cmd.Text = (root is not null && ConfigWriter.HasCompileFile(root, path!)) ? "Recompile" : "Compile";
     }
 
     private void Execute(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        string? selectedPath = GetSelectedPath();
-
-        if (!IsCompileEligibleFile(selectedPath))
+        if (GetSelectionKind() != SelectionKind.CompileFile)
         {
-            Log("[CloudMate] Compile: please select a supported static file (not config/image/folder).");
+            Log("[CloudMate] Compile: select a supported static file (not config / image / folder).");
             return;
         }
 
-        string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
-        if (projectRoot is null)
+        string? path = GetSelectedPath();
+        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+        if (root is null)
         {
-            Log($"[CloudMate] Compile: could not find a .csproj for '{Path.GetFileName(selectedPath)}'.");
+            Log($"[CloudMate] Compile: could not find a .csproj for '{Path.GetFileName(path)}'.");
             return;
         }
 
-        bool inConfig = ConfigWriter.HasCompileFile(projectRoot, selectedPath!);
-        if (!inConfig)
+        if (!ConfigWriter.HasCompileFile(root, path!))
         {
-            ConfigWriter.Result result = ConfigWriter.AddCompileFile(projectRoot, selectedPath!);
-            Log(result.Added
-                ? $"[compile] {result.Input} -> {result.Output}  (added to {Path.GetFileName(result.ConfigPath)})"
-                : $"[compile] {result.Message}");
+            ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path!);
+            Log(r.Added
+                ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
+                : $"[compile] {r.Message}");
         }
         else
         {
-            Log($"[recompile] {Path.GetFileName(selectedPath)} is already configured. Running one-time rebuild.");
+            Log($"[recompile] {Path.GetFileName(path)} already configured – running one-time rebuild.");
         }
 
-        Log($"> mate  [{projectRoot}]");
-        RunBuild(projectRoot, new string[0]);
-        EnsureAlwaysWatching(projectRoot);
+        Log($"> mate  [{root}]");
+        RunBuild(root, new string[0]);
+        EnsureAlwaysWatching(root);
     }
 }

@@ -18,6 +18,11 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 [Guid(PackageGuidString)]
 [ProvideMenuResource("Menus.ctmenu", 1)]
+// Auto-load so BeforeQueryStatus visibility filtering works before any command is executed.
+// Without this the package stays unloaded and VS shows the raw VSCT defaults on right-click.
+[ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExistsAndFullyLoaded_string, PackageAutoLoadFlags.BackgroundLoad)]
+[ProvideAutoLoad(VSConstants.UICONTEXT.SolutionHasSingleProject_string, PackageAutoLoadFlags.BackgroundLoad)]
+[ProvideAutoLoad(VSConstants.UICONTEXT.SolutionHasMultipleProjects_string, PackageAutoLoadFlags.BackgroundLoad)]
 public sealed class CloudMatePackage : AsyncPackage
 {
     public const string PackageGuidString = "A1B2C3D4-E5F6-7890-ABCD-EF1234567890";

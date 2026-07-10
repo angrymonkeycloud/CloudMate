@@ -1,11 +1,9 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Id="CloudMate.VSIX" Version="1.0.4" Language="en-US" Publisher="Angry Monkey" />
+    <Identity Id="CloudMate.VSIX" Version="1.0.8" Language="en-US" Publisher="Angry Monkey" />
     <DisplayName>CloudMate</DisplayName>
-    <Description xml:space="preserve">
-	  Compile, bundle, compress, and watch web assets (TypeScript, LESS, SCSS, CSS, JS) using
-	  the CloudMate (mate) CLI. Adds context menus on solution explorer items and an auto-watch
-	  feature that rebuilds on every supported file change.
+    <Description>
+	  Compile, bundle, compress, and watch web assets (TypeScript, LESS, SCSS, CSS, JS) using the CloudMate (mate) CLI. Adds context menus on solution explorer items and an auto-watch feature that rebuilds on every supported file change.
 	</Description>
     <MoreInfo>https://github.com/angrymonkeycloud/CloudMate</MoreInfo>
     <Icon>amc-logo-200x200.png</Icon>

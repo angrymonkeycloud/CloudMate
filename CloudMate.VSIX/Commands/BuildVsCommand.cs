@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.ComponentModel.Design;
@@ -6,7 +6,10 @@ using Microsoft.VisualStudio.Shell;
 
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
 
-/// <summary>Runs <c>mate</c> (dev build) in the project root of the selected item.</summary>
+/// <summary>
+/// Runs a one-time mate rebuild.
+/// Visible ONLY when the .mateconfig.json file is selected.
+/// </summary>
 internal sealed class BuildVsCommand : VsCommandBase
 {
     private static readonly Guid CmdSetGuid = new("B2C3D4E5-F6A7-8901-BCDE-F12345678901");
@@ -17,7 +20,6 @@ internal sealed class BuildVsCommand : VsCommandBase
     public static async Task InitializeAsync(AsyncPackage package)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
-
         var instance = new BuildVsCommand(package);
         var svc = GetCommandService(package);
         var cmd = new OleMenuCommand(instance.Execute, new CommandID(CmdSetGuid, CmdId));
@@ -25,15 +27,13 @@ internal sealed class BuildVsCommand : VsCommandBase
         svc.AddCommand(cmd);
     }
 
-    /// <summary>Rebuild is only offered on the .mateconfig.json file.</summary>
     private void QueryStatus(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
+        if (sender is not OleMenuCommand cmd) return;
 
-        if (sender is not OleMenuCommand cmd)
-            return;
-
-        cmd.Visible = IsConfigFileSelected();
+        // Show only when .mateconfig.json is selected
+        cmd.Visible = GetSelectionKind() == SelectionKind.ConfigFile;
         cmd.Text = "Rebuild";
     }
 
@@ -41,17 +41,22 @@ internal sealed class BuildVsCommand : VsCommandBase
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        string? selectedPath = GetSelectedPath();
-        string? workingDir = selectedPath is not null ? ConfigWriter.FindProjectRoot(selectedPath) : null;
-
-        if (workingDir is null)
+        if (GetSelectionKind() != SelectionKind.ConfigFile)
         {
-            Log("[CloudMate] Rebuild: please select a .mateconfig.json inside a project.");
+            Log("[CloudMate] Rebuild: select a .mateconfig.json file.");
             return;
         }
 
-        Log($"> mate  [{workingDir}]");
-        RunBuild(workingDir, new string[0]);
-        EnsureAlwaysWatching(workingDir);
+        string? path = GetSelectedPath();
+        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+        if (root is null)
+        {
+            Log("[CloudMate] Rebuild: could not find a project root for the selected config.");
+            return;
+        }
+
+        Log($"> mate  [{root}]");
+        RunBuild(root, new string[0]);
+        EnsureAlwaysWatching(root);
     }
 }

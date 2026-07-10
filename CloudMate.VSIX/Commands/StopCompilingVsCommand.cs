@@ -1,12 +1,15 @@
-using System;
-using System.ComponentModel.Design;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.ComponentModel.Design;
 using Microsoft.VisualStudio.Shell;
 
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
 
-/// <summary>Removes the selected file from .mateconfig.json compile entries.</summary>
+/// <summary>
+/// Removes the selected file from .mateconfig.json compile entries.
+/// Visible only when a CompileFile is selected AND it is already in the config.
+/// </summary>
 internal sealed class StopCompilingVsCommand : VsCommandBase
 {
     private static readonly Guid CmdSetGuid = new("B2C3D4E5-F6A7-8901-BCDE-F12345678901");
@@ -17,7 +20,6 @@ internal sealed class StopCompilingVsCommand : VsCommandBase
     public static async Task InitializeAsync(AsyncPackage package)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
-
         var instance = new StopCompilingVsCommand(package);
         var svc = GetCommandService(package);
         var cmd = new OleMenuCommand(instance.Execute, new CommandID(CmdSetGuid, CmdId));
@@ -28,50 +30,49 @@ internal sealed class StopCompilingVsCommand : VsCommandBase
     private void QueryStatus(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
+        if (sender is not OleMenuCommand cmd) return;
 
-        if (sender is not OleMenuCommand cmd)
-            return;
-
-        string? selectedPath = GetSelectedPath();
-        if (!IsCompileEligibleFile(selectedPath))
+        // Only show for compile-eligible files that are already configured
+        if (GetSelectionKind() != SelectionKind.CompileFile)
         {
             cmd.Visible = false;
             return;
         }
 
-        string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
-        cmd.Visible = projectRoot is not null && ConfigWriter.HasCompileFile(projectRoot, selectedPath!);
+        string? path = GetSelectedPath();
+        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+        cmd.Visible = root is not null && ConfigWriter.HasCompileFile(root, path!);
     }
 
     private void Execute(object sender, EventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        string? selectedPath = GetSelectedPath();
-        if (!IsCompileEligibleFile(selectedPath))
+        if (GetSelectionKind() != SelectionKind.CompileFile)
         {
             Log("[CloudMate] Stop Compiling: select a configured static file.");
             return;
         }
 
-        string? projectRoot = ConfigWriter.FindProjectRoot(selectedPath!);
-        if (projectRoot is null)
+        string? path = GetSelectedPath();
+        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+        if (root is null)
         {
-            Log($"[CloudMate] Stop Compiling: could not find a .csproj for '{Path.GetFileName(selectedPath)}'.");
+            Log($"[CloudMate] Stop Compiling: could not find a .csproj for '{Path.GetFileName(path)}'.");
             return;
         }
 
-        ConfigWriter.Result result = ConfigWriter.RemoveCompileFile(projectRoot, selectedPath!);
-        Log(result.Added
-            ? $"[compile] stopped: {result.Input} ({result.Message})"
-            : $"[compile] {result.Message}");
+        ConfigWriter.Result r = ConfigWriter.RemoveCompileFile(root, path!);
+        Log(r.Added
+            ? $"[compile] stopped: {r.Input} ({r.Message})"
+            : $"[compile] {r.Message}");
 
-        if (result.Added)
+        if (r.Added)
         {
-            Log($"> mate  [{projectRoot}]");
-            RunBuild(projectRoot, new string[0]);
+            Log($"> mate  [{root}]");
+            RunBuild(root, new string[0]);
         }
 
-        EnsureAlwaysWatching(projectRoot);
+        EnsureAlwaysWatching(root);
     }
 }

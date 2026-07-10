@@ -16,11 +16,16 @@
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
     <DeployExtension>false</DeployExtension>
+    <GenerateVsixSignatureFile>false</GenerateVsixSignatureFile>
 
     <!-- Let the NuGet-provided VSSDK build package auto-import Microsoft.VsSDK.targets
          at the correct point in the SDK build pipeline. This wires CreateVsixContainer
          and GeneratePkgDef into the standard Build target so the .vsix is produced. -->
     <VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>
+
+    <!-- Publishing-ready settings: enable Release build for distribution -->
+    <Configurations>Debug;Release</Configurations>
+    <Optimize Condition="'$(Configuration)'=='Release'">true</Optimize>
 
     <NuGetAudit>false</NuGetAudit>
     <NoWarn>$(NoWarn);NU1701;NU1603</NoWarn>
@@ -46,6 +51,38 @@
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
+    <!-- Extension logo: must be Content + IncludeInVSIX so it lands in the VSIX zip root -->
+    <Content Include="amc-logo-200x200.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Per-command icons: loose files in the VSIX next to the image manifest,
+         referenced by relative URIs (project is not WPF, so Resource embedding is unavailable) -->
+    <Content Include="Resources\CloudMate.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Compile.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Stop.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Compress.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Rebuild.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Image manifest maps monikers to the separate high-resolution PNGs -->
+    <Content Include="Resources\CloudMate.imagemanifest">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <VSCTCompile Include="CloudMatePackage.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
