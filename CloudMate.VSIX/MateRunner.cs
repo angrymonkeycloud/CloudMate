@@ -19,6 +19,10 @@ internal static class MateRunner
     private static bool _watchStopRequested;
     private static readonly object _watchLock = new();
 
+    private static FileSystemWatcher? _configWatcher;
+    private static string? _configWatcherPath;
+    private static DateTime _lastConfigReloadUtc;
+
     public static bool IsWatching
     {
         get
@@ -42,7 +46,10 @@ internal static class MateRunner
 
             if (_watchProcess is { HasExited: false }
                 && string.Equals(_watchProcess.StartInfo.WorkingDirectory, workingDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                EnsureConfigWatcher(workingDirectory);
                 return;
+            }
 
             if (_watchProcess is { HasExited: false })
             {
@@ -56,6 +63,7 @@ internal static class MateRunner
             }
 
             _watchStopRequested = false;
+            EnsureConfigWatcher(workingDirectory);
             StartWatchInternal();
         }
     }
@@ -157,21 +165,94 @@ internal static class MateRunner
         {
             _watchStopRequested = true;
 
-            if (_watchProcess is null)
+            if (_watchProcess is not null)
+            {
+                try
+                {
+                    if (!_watchProcess.HasExited)
+                        _watchProcess.Kill(); // entireProcessTree parameter not available on .NET Framework 4.7.2
+                }
+                catch { /* already exited */ }
+                finally
+                {
+                    _watchProcess.Dispose();
+                    _watchProcess = null;
+                }
+            }
+
+            DisposeConfigWatcher();
+        }
+    }
+
+    private static void EnsureConfigWatcher(string workingDirectory)
+    {
+        string configPath = Path.Combine(workingDirectory, ConfigWriter.ConfigFileName);
+
+        if (_configWatcher is not null
+            && string.Equals(_configWatcherPath, configPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        DisposeConfigWatcher();
+
+        _configWatcherPath = configPath;
+        _configWatcher = new FileSystemWatcher(workingDirectory, ConfigWriter.ConfigFileName)
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size | NotifyFilters.FileName,
+            IncludeSubdirectories = false,
+            EnableRaisingEvents = true
+        };
+
+        _configWatcher.Changed += (_, _) => ReloadWatchOnConfigChanged();
+        _configWatcher.Created += (_, _) => ReloadWatchOnConfigChanged();
+        _configWatcher.Renamed += (_, _) => ReloadWatchOnConfigChanged();
+        _configWatcher.Deleted += (_, _) => ReloadWatchOnConfigChanged();
+    }
+
+    private static void ReloadWatchOnConfigChanged()
+    {
+        lock (_watchLock)
+        {
+            if (_watchStopRequested || string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
                 return;
 
-            try
+            // Debounce duplicate file events from save operations.
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastConfigReloadUtc).TotalMilliseconds < 250)
+                return;
+            _lastConfigReloadUtc = now;
+
+            _watchOutput("[CloudMate] mateconfig.json changed. reloading watch...");
+
+            if (_watchProcess is { HasExited: false })
             {
-                if (!_watchProcess.HasExited)
-                    _watchProcess.Kill(); // entireProcessTree parameter not available on .NET Framework 4.7.2
+                _watchStopRequested = true;
+                try { _watchProcess.Kill(); } catch { }
+                finally
+                {
+                    _watchProcess.Dispose();
+                    _watchProcess = null;
+                }
             }
-            catch { /* already exited */ }
-            finally
+
+            _watchStopRequested = false;
+            StartWatchInternal();
+        }
+    }
+
+    private static void DisposeConfigWatcher()
+    {
+        try
+        {
+            if (_configWatcher is not null)
             {
-                _watchProcess.Dispose();
-                _watchProcess = null;
+                _configWatcher.EnableRaisingEvents = false;
+                _configWatcher.Dispose();
+                _configWatcher = null;
             }
         }
+        catch { }
+
+        _configWatcherPath = null;
     }
 
     /// <summary>

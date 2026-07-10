@@ -59,29 +59,43 @@ internal sealed class CompileVsCommand : VsCommandBase
 
         string? path = GetSelectedPath();
         string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
-        if (root is null)
+        if (root is null || path is null)
         {
             Log($"[CloudMate] Compile: could not find a .csproj for '{Path.GetFileName(path)}'.");
             return;
         }
 
-        if (!ConfigWriter.HasCompileFile(root, path!))
+        _ = Task.Run(() =>
         {
-            ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path!);
-            Log(r.Added
-                ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
-                : $"[compile] {r.Message}");
+            bool added = false;
 
-            // Always enforce Build Action = None / Do not copy on the config item.
-            EnsureConfigItemProperties(root);
-        }
-        else
-        {
-            Log($"[recompile] {Path.GetFileName(path)} already configured – running one-time rebuild.");
-        }
+            if (!ConfigWriter.HasCompileFile(root, path))
+            {
+                ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path);
+                CloudMatePackage.OutputLine(Package, r.Added
+                    ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
+                    : $"[compile] {r.Message}");
 
-        Log($"> mate  [{root}]");
-        RunBuild(root, new string[0]);
-        EnsureAlwaysWatching(root);
+                added = r.Added;
+            }
+            else
+            {
+                CloudMatePackage.OutputLine(Package, $"[recompile] {Path.GetFileName(path)} already configured – running one-time rebuild.");
+            }
+
+            // Set project-item metadata on UI thread only when a new config entry was added.
+            if (added)
+            {
+                ThreadHelper.JoinableTaskFactory.Run(async delegate
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    EnsureConfigItemProperties(root);
+                });
+            }
+
+            CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
+            RunBuild(root, Array.Empty<string>());
+            EnsureAlwaysWatching(root);
+        });
     }
 }

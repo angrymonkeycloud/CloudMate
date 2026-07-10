@@ -2,7 +2,7 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
 				 xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-	<Identity Id="AngryMonkey.CloudMate" Version="1.0.1" Language="en-US" Publisher="Angry Monkey" />
+	<Identity Id="AngryMonkey.CloudMate" Version="1.0.2" Language="en-US" Publisher="Angry Monkey" />
 	<DisplayName>CloudMate</DisplayName>
 	<Description>CloudMate compiles and bundles web assets (TypeScript, JavaScript, CSS, LESS, SCSS, SASS), supports image compression workflows, and provides rebuild/watch tooling directly in Solution Explorer. Best used with .NET projects that manage front-end assets alongside C# solutions. Website: https://angrymonkeycloud.com/cloudmate | GitHub: https://github.com/angrymonkeycloud/CloudMate</Description>
 	<MoreInfo>https://angrymonkeycloud.com/cloudmate</MoreInfo>

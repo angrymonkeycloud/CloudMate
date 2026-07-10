@@ -8,7 +8,7 @@ namespace AngryMonkey.CloudMate.VisualStudio.Commands;
 
 /// <summary>
 /// Runs a one-time mate rebuild.
-/// Visible ONLY when the .mateconfig.json file is selected.
+/// Visible ONLY when the mateconfig.json file is selected.
 /// </summary>
 internal sealed class BuildVsCommand : VsCommandBase
 {
@@ -32,7 +32,7 @@ internal sealed class BuildVsCommand : VsCommandBase
         ThreadHelper.ThrowIfNotOnUIThread();
         if (sender is not OleMenuCommand cmd) return;
 
-        // Show only when .mateconfig.json is selected
+        // Show only when mateconfig.json is selected
         cmd.Visible = GetSelectionKind() == SelectionKind.ConfigFile;
         cmd.Text = "Rebuild";
     }
@@ -43,7 +43,7 @@ internal sealed class BuildVsCommand : VsCommandBase
 
         if (GetSelectionKind() != SelectionKind.ConfigFile)
         {
-            Log("[CloudMate] Rebuild: select a .mateconfig.json file.");
+            Log("[CloudMate] Rebuild: select a mateconfig.json file.");
             return;
         }
 

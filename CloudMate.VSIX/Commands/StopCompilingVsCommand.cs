@@ -56,23 +56,26 @@ internal sealed class StopCompilingVsCommand : VsCommandBase
 
         string? path = GetSelectedPath();
         string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
-        if (root is null)
+        if (root is null || path is null)
         {
             Log($"[CloudMate] Stop Compiling: could not find a .csproj for '{Path.GetFileName(path)}'.");
             return;
         }
 
-        ConfigWriter.Result r = ConfigWriter.RemoveCompileFile(root, path!);
-        Log(r.Added
-            ? $"[compile] stopped: {r.Input} ({r.Message})"
-            : $"[compile] {r.Message}");
-
-        if (r.Added)
+        _ = Task.Run(() =>
         {
-            Log($"> mate  [{root}]");
-            RunBuild(root, new string[0]);
-        }
+            ConfigWriter.Result r = ConfigWriter.RemoveCompileFile(root, path);
+            CloudMatePackage.OutputLine(Package, r.Added
+                ? $"[compile] stopped: {r.Input} ({r.Message})"
+                : $"[compile] {r.Message}");
 
-        EnsureAlwaysWatching(root);
+            if (r.Added)
+            {
+                CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
+                RunBuild(root, Array.Empty<string>());
+            }
+
+            EnsureAlwaysWatching(root);
+        });
     }
 }

@@ -64,10 +64,18 @@ internal static class ConfigWriter
     {
         string configPath = Path.Combine(projectRoot, ConfigFileName);
 
+        bool created = false;
         if (!File.Exists(configPath))
+        {
             File.WriteAllText(configPath, "{}\n");
+            created = true;
+        }
 
-        EnsureConfigProjectMetadata(projectRoot);
+        // Project-file metadata update can trigger project-system work.
+        // Only do it when the config is first created to avoid UI hitches on every command.
+        if (created)
+            EnsureConfigProjectMetadata(projectRoot);
+
         return configPath;
     }
 
@@ -219,12 +227,17 @@ internal static class ConfigWriter
 
         string[] segments = relativeSource.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
 
+        // Only source paths rooted under src/ or source/ are mapped into wwwroot.
+        // Any other path stays in place (same directory as input).
         if (segments.Length > 0 && SourceFolderNames.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
+        {
             segments = segments.Skip(1).ToArray();
+            return segments.Length == 0
+                ? "wwwroot"
+                : "wwwroot/" + string.Join("/", segments);
+        }
 
-        return segments.Length == 0
-            ? "wwwroot"
-            : "wwwroot/" + string.Join("/", segments);
+        return relativeSource;
     }
 
     // ─── Compile (files) ───────────────────────────────────────────────────────
