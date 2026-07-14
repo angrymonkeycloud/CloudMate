@@ -13,6 +13,22 @@ public class MateBundler
     public static Action<string> LogError { get; set; } = Console.Error.WriteLine;
 
     /// <summary>
+    /// Releases all cached compiler engines and script caches (typically 50–150 MB combined)
+    /// and compacts the managed heap. Engines are lazily re-created on the next compile,
+    /// so this is safe to call whenever the process is idle.
+    /// </summary>
+    public static void ReleaseMemory()
+    {
+        TypeScriptCompiler.ReleaseEngine();
+        SassCompiler.ReleaseEngine();
+        LessCompiler.ReleaseEngine();
+        CompilerAssets.ClearCache();
+
+        System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+    }
+
+    /// <summary>
     /// Runs all file entries for the requested builds.
     /// <paramref name="builds"/> semantics match the legacy CLI: null = all builds, empty = ["dev"].
     /// </summary>

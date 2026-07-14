@@ -24,6 +24,16 @@ internal static class CompilerAssets
     public static Prepared<Script> GetPreparedScript(string assetName)
         => _prepared.GetOrAdd(assetName, name => Engine.PrepareScript(GetSource(name), source: name));
 
+    /// <summary>
+    /// Drops the cached raw sources and prepared scripts (several MB each).
+    /// They are lazily re-read from embedded resources on next use.
+    /// </summary>
+    public static void ClearCache()
+    {
+        _sources.Clear();
+        _prepared.Clear();
+    }
+
     private static string ReadAsset(string name)
     {
         Assembly assembly = typeof(CompilerAssets).Assembly;

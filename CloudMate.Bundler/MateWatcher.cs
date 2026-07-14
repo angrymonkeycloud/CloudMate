@@ -17,7 +17,16 @@ public sealed class MateWatcher : IDisposable
     private readonly object _lock = new();
     private readonly ManualResetEventSlim _exitSignal = new(false);
     private readonly Dictionary<string, DateTime> _lastRunUtc = [];
+    private readonly Timer _idleReleaseTimer;
     private bool _disposed;
+
+    /// <summary>Idle time after the last compile before compiler engines are released to reclaim memory.</summary>
+    private static readonly TimeSpan IdleReleaseDelay = TimeSpan.FromSeconds(90);
+
+    /// <summary>Directory names whose file events never affect source compilation.</summary>
+    private static readonly string[] ExcludedPathSegments =
+        ["\\bin\\", "/bin/", "\\obj\\", "/obj/", "\\node_modules\\", "/node_modules/",
+         "\\.git\\", "/.git/", "\\.vs\\", "/.vs/", "\\wwwroot\\", "/wwwroot/"];
 
     public static Action<string> Log { get; set; } = Console.WriteLine;
     public static Action<string> LogError { get; set; } = Console.Error.WriteLine;
@@ -27,9 +36,25 @@ public sealed class MateWatcher : IDisposable
         _config = config;
         _builds = builds;
 
+        // Releases compiler engines after a period of inactivity; re-armed on every compile.
+        _idleReleaseTimer = new Timer(_ => MateBundler.ReleaseMemory(), null, IdleReleaseDelay, Timeout.InfiniteTimeSpan);
+
         AttachFileWatchers();
         AttachConfigWatcher();
         AttachImageWatchers();
+    }
+
+    /// <summary>True when the changed path lives in a directory that can never affect compilation.</summary>
+    private static bool IsExcludedPath(string? fullPath)
+    {
+        if (string.IsNullOrEmpty(fullPath))
+            return false;
+
+        foreach (string segment in ExcludedPathSegments)
+            if (fullPath!.IndexOf(segment, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+        return false;
     }
 
     private void AttachFileWatchers()
@@ -74,16 +99,23 @@ public sealed class MateWatcher : IDisposable
         }
 
         // One recursive watcher per extension, dispatching to every subscribed entry.
+        // Events from non-source directories (bin, obj, node_modules, wwwroot, …) are ignored.
         if (lessSubscribers.Count > 0)
-            AddWatcher(_config.RootDirectory, "*.less", (_, _) =>
+            AddWatcher(_config.RootDirectory, "*.less", (_, e) =>
             {
+                if (IsExcludedPath(e.FullPath))
+                    return;
+
                 foreach ((MateConfigFile f, string b) in lessSubscribers)
                     RunFile(f, b);
             }, recursive: true);
 
         if (scssSubscribers.Count > 0)
-            AddWatcher(_config.RootDirectory, "*.scss", (_, _) =>
+            AddWatcher(_config.RootDirectory, "*.scss", (_, e) =>
             {
+                if (IsExcludedPath(e.FullPath))
+                    return;
+
                 foreach ((MateConfigFile f, string b) in scssSubscribers)
                     RunFile(f, b);
             }, recursive: true);
@@ -161,6 +193,13 @@ public sealed class MateWatcher : IDisposable
             {
                 LogError($"Watch error: {ex.Message}");
             }
+            finally
+            {
+                // Re-arm the idle release: engines stay warm during active editing,
+                // then get released after IdleReleaseDelay of no compiles.
+                try { _idleReleaseTimer.Change(IdleReleaseDelay, Timeout.InfiniteTimeSpan); }
+                catch (ObjectDisposedException) { }
+            }
         }
     }
 
@@ -206,6 +245,11 @@ public sealed class MateWatcher : IDisposable
     public void Stop()
     {
         Dispose();
+
+        try { _idleReleaseTimer.Dispose(); }
+        catch { }
+
+        MateBundler.ReleaseMemory();
         _exitSignal.Set();
     }
 

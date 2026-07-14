@@ -182,6 +182,19 @@ internal static class LessCompiler
         return engine;
     }
 
+    /// <summary>
+    /// Releases the cached Jint engine (tens of MB of JS heap). The next compile
+    /// transparently re-creates it. Safe to call at any time.
+    /// </summary>
+    public static void ReleaseEngine()
+    {
+        lock (_lock)
+        {
+            _engine?.Dispose();
+            _engine = null;
+        }
+    }
+
     private static string? ReadFile(string fileName)
     {
         string path = fileName.Replace('/', Path.DirectorySeparatorChar);

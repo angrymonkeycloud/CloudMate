@@ -17,6 +17,12 @@
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>mate</ToolCommandName>
 		<PackageId>AngryMonkey.CloudMate.CLI</PackageId>
+		<!-- Memory-friendly runtime: workstation GC + conserve mode keeps long-running watch sessions light -->
+		<ServerGarbageCollection>false</ServerGarbageCollection>
+		<ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+		<GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
+		<TieredPgo>true</TieredPgo>
+		<InvariantGlobalization>true</InvariantGlobalization>
 	</PropertyGroup>
 
 	<ItemGroup>

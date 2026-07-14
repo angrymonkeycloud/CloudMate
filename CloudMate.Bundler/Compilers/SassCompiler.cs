@@ -264,6 +264,19 @@ internal static class SassCompiler
         return engine;
     }
 
+    /// <summary>
+    /// Releases the cached Jint engine (tens of MB of JS heap). The next compile
+    /// transparently re-creates it. Safe to call at any time.
+    /// </summary>
+    public static void ReleaseEngine()
+    {
+        lock (_lock)
+        {
+            _engine?.Dispose();
+            _engine = null;
+        }
+    }
+
     /// <summary>Resolves an import URL to a canonical file:// URL, honoring sass partial conventions.</summary>
     private static string? Canonicalize(string url, string? containingUrl)
     {
