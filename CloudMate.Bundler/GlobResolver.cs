@@ -9,7 +9,7 @@ namespace AngryMonkey.CloudMate;
 /// </summary>
 internal static class GlobResolver
 {
-    public static List<string> Resolve(IEnumerable<string> patterns, string rootDirectory)
+    public static List<string> Resolve(IEnumerable<string> patterns, string rootDirectory, Action<string>? onMissingFile = null)
     {
         List<string> results = [];
 
@@ -24,7 +24,13 @@ internal static class GlobResolver
             {
                 string fullPath = Path.GetFullPath(Path.Combine(rootDirectory, normalized));
 
-                if (File.Exists(fullPath) && !results.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+                if (!File.Exists(fullPath))
+                {
+                    onMissingFile?.Invoke(fullPath);
+                    continue;
+                }
+
+                if (!results.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
                     results.Add(fullPath);
 
                 continue;

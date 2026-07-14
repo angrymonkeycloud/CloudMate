@@ -145,17 +145,27 @@ internal static class MateRunner
             if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
                 return;
 
-            logOutput = _watchOutput;
-            logError = _watchError;
-            errorAfterLock = "[CloudMate] watch exited unexpectedly. restarting...";
-
-            try
+            // Don't restart if the config file was deleted while the watch was running.
+            if (!File.Exists(Path.Combine(_watchWorkingDirectory, ConfigWriter.ConfigFileName)))
             {
-                logAfterLock = StartWatchInternal();
+                logError = _watchError;
+                errorAfterLock = "[CloudMate] mateconfig.json not found. watch will not restart.";
+                // Leave _watchStopRequested false so EnsureWatch can re-arm if config is recreated.
             }
-            catch (Exception ex)
+            else
             {
-                retryErrorAfterLock = $"[CloudMate] watch restart failed: {ex.Message}";
+                logOutput = _watchOutput;
+                logError = _watchError;
+                errorAfterLock = "[CloudMate] watch exited unexpectedly. restarting...";
+
+                try
+                {
+                    logAfterLock = StartWatchInternal();
+                }
+                catch (Exception ex)
+                {
+                    retryErrorAfterLock = $"[CloudMate] watch restart failed: {ex.Message}";
+                }
             }
         }
 
@@ -260,23 +270,44 @@ internal static class MateRunner
                 return;
             _lastConfigReloadUtc = now;
 
-            noticeAfterLock = "[CloudMate] mateconfig.json changed. reloading watch...";
             logOutput = _watchOutput;
 
-            if (_watchProcess is { HasExited: false })
+            // Config deleted — stop the watch rather than trying to restart it.
+            if (!File.Exists(Path.Combine(_watchWorkingDirectory!, ConfigWriter.ConfigFileName)))
             {
+                noticeAfterLock = "[CloudMate] mateconfig.json deleted. watch stopped.";
                 _watchStopRequested = true;
-                try { _watchProcess.Kill(); }
-                catch { }
-                finally
+
+                if (_watchProcess is { HasExited: false })
                 {
-                    _watchProcess.Dispose();
-                    _watchProcess = null;
+                    try { _watchProcess.Kill(); }
+                    catch { }
+                    finally
+                    {
+                        _watchProcess.Dispose();
+                        _watchProcess = null;
+                    }
                 }
             }
+            else
+            {
+                noticeAfterLock = "[CloudMate] mateconfig.json changed. reloading watch...";
 
-            _watchStopRequested = false;
-            logAfterLock = StartWatchInternal();
+                if (_watchProcess is { HasExited: false })
+                {
+                    _watchStopRequested = true;
+                    try { _watchProcess.Kill(); }
+                    catch { }
+                    finally
+                    {
+                        _watchProcess.Dispose();
+                        _watchProcess = null;
+                    }
+                }
+
+                _watchStopRequested = false;
+                logAfterLock = StartWatchInternal();
+            }
         }
 
         // Emit log lines AFTER the lock is released so OutputLine never blocks while _watchLock is held.

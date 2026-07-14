@@ -26,6 +26,12 @@ internal static class ConfigWriter
     /// <summary>Result of a config mutation, describing what happened for user feedback.</summary>
     internal sealed record Result(bool Added, string ConfigPath, string Input, string Output, string? Message = null);
 
+    /// <summary>Result of a config clean operation.</summary>
+    internal sealed record CleanResult(int EntriesRemoved, int InputsRemoved, string ConfigPath);
+
+    /// <summary>Result of an auto-configure operation.</summary>
+    internal sealed record AutoConfigureResult(int Added, int AlreadyConfigured, string ConfigPath);
+
     /// <summary>
     /// Walks up from <paramref name="startPath"/> (a file or directory) to find the directory
     /// containing the nearest <c>*.csproj</c>. Returns <see langword="null"/> when none is found.
@@ -489,6 +495,159 @@ internal static class ConfigWriter
         Save(configPath, root);
         return new Result(true, configPath, relativeInput, relativeOutput,
             removed == 1 ? "Removed from mateconfig.json." : $"Removed {removed} compress entries from mateconfig.json.");
+    }
+
+    // ─── Clean (remove missing inputs) ──────────────────────────────────────────
+
+    /// <summary>
+    /// Removes entries from <c>files</c> and <c>images</c> whose non-glob input paths no
+    /// longer exist on disk. Glob patterns (<c>*</c>, <c>?</c>) are always preserved.
+    /// When an entry's entire input set is removed the entry itself is deleted; when only
+    /// some items in an array input are missing, those items are pruned and the entry kept.
+    /// </summary>
+    public static CleanResult CleanConfig(string configPath, string projectRoot)
+    {
+        JsonObject root = Load(configPath);
+        int entriesRemoved = 0;
+        int inputsRemoved = 0;
+
+        CleanEntries(root["files"] as JsonArray, projectRoot, ref entriesRemoved, ref inputsRemoved);
+        CleanEntries(root["images"] as JsonArray, projectRoot, ref entriesRemoved, ref inputsRemoved);
+
+        if (entriesRemoved > 0 || inputsRemoved > 0)
+            Save(configPath, root);
+
+        return new CleanResult(entriesRemoved, inputsRemoved, configPath);
+    }
+
+    private static void CleanEntries(JsonArray? entries, string projectRoot, ref int entriesRemoved, ref int inputsRemoved)
+    {
+        if (entries is null)
+            return;
+
+        for (int i = entries.Count - 1; i >= 0; i--)
+        {
+            if (entries[i] is not JsonObject entry)
+                continue;
+
+            JsonNode? inputNode = entry["input"];
+
+            if (inputNode is JsonValue singleValue && singleValue.TryGetValue(out string? singleStr))
+            {
+                if (!InputPathExists(singleStr!, projectRoot))
+                {
+                    entries.RemoveAt(i);
+                    entriesRemoved++;
+                }
+            }
+            else if (inputNode is JsonArray inputArray)
+            {
+                int removed = 0;
+
+                for (int j = inputArray.Count - 1; j >= 0; j--)
+                {
+                    if (inputArray[j] is JsonValue v && v.TryGetValue(out string? s) && !InputPathExists(s!, projectRoot))
+                    {
+                        inputArray.RemoveAt(j);
+                        removed++;
+                    }
+                }
+
+                inputsRemoved += removed;
+
+                if (inputArray.Count == 0)
+                {
+                    entries.RemoveAt(i);
+                    entriesRemoved++;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the input should be kept: glob patterns are always
+    /// preserved; concrete paths are kept when they resolve to an existing file or directory.
+    /// </summary>
+    private static bool InputPathExists(string input, string projectRoot)
+    {
+        if (input.Contains('*') || input.Contains('?'))
+            return true;
+
+        string fullPath = Path.GetFullPath(Path.Combine(projectRoot, input.Replace('/', Path.DirectorySeparatorChar)));
+        return File.Exists(fullPath) || Directory.Exists(fullPath);
+    }
+
+    // ─── Auto-configure (add unconfigured source files) ─────────────────────────
+
+    /// <summary>
+    /// Scans the project root for compilable source files (<c>.ts</c>, <c>.less</c>,
+    /// <c>.scss</c>, <c>.sass</c>) and adds any that are not yet present in
+    /// <c>mateconfig.json</c>. Directories that are never source roots
+    /// (<c>bin</c>, <c>obj</c>, <c>node_modules</c>, <c>.git</c>, <c>.vs</c>,
+    /// <c>wwwroot</c>) are skipped.
+    /// </summary>
+    public static AutoConfigureResult AutoConfigureFiles(string projectRoot)
+    {
+        string configPath = EnsureConfigExists(projectRoot);
+
+        int added = 0;
+        int alreadyConfigured = 0;
+
+        foreach (string file in DiscoverCompilableFiles(projectRoot))
+        {
+            if (HasCompileFile(projectRoot, file))
+            {
+                alreadyConfigured++;
+                continue;
+            }
+
+            Result result = AddCompileFile(projectRoot, file);
+            if (result.Added)
+                added++;
+        }
+
+        return new AutoConfigureResult(added, alreadyConfigured, configPath);
+    }
+
+    private static readonly HashSet<string> AutoConfigureExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".ts", ".less", ".scss", ".sass"
+    };
+
+    private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", "node_modules", ".git", ".vs", "wwwroot"
+    };
+
+    private static IEnumerable<string> DiscoverCompilableFiles(string projectRoot)
+    {
+        return EnumerateSourceFiles(new DirectoryInfo(projectRoot));
+    }
+
+    private static IEnumerable<string> EnumerateSourceFiles(DirectoryInfo directory)
+    {
+        FileInfo[] files;
+        try { files = directory.GetFiles(); }
+        catch { yield break; }
+
+        foreach (FileInfo file in files)
+        {
+            if (AutoConfigureExtensions.Contains(file.Extension))
+                yield return file.FullName;
+        }
+
+        DirectoryInfo[] subdirs;
+        try { subdirs = directory.GetDirectories(); }
+        catch { yield break; }
+
+        foreach (DirectoryInfo subdir in subdirs)
+        {
+            if (ExcludedDirectories.Contains(subdir.Name))
+                continue;
+
+            foreach (string file in EnumerateSourceFiles(subdir))
+                yield return file;
+        }
     }
 
     // ─── Shared entry helpers ──────────────────────────────────────────────────

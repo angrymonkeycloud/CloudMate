@@ -171,21 +171,31 @@ public class MateBundler
         List<string> pieces,
         List<KeyValuePair<string, string>> declarations)
     {
-        List<string> files = GlobResolver.Resolve(patterns, config.RootDirectory);
+        List<string> files = GlobResolver.Resolve(patterns, config.RootDirectory, missing => LogError($"File not found: {missing}"));
 
         if (files.Count == 0)
             return;
 
         if (inputExtension == outputExtension)
         {
-            pieces.AddRange(files.Select(File.ReadAllText));
+            foreach (string file in files)
+            {
+                try { pieces.Add(File.ReadAllText(file)); }
+                catch (Exception exception) { LogError($"{file}: {exception.Message}"); }
+            }
+
             return;
         }
 
         switch (inputExtension)
         {
             case "css":
-                pieces.AddRange(files.Select(File.ReadAllText));
+                foreach (string file in files)
+                {
+                    try { pieces.Add(File.ReadAllText(file)); }
+                    catch (Exception exception) { LogError($"{file}: {exception.Message}"); }
+                }
+
                 break;
 
             case "less":
@@ -206,7 +216,16 @@ public class MateBundler
             case "scss":
             case "sass":
                 foreach (string file in files)
-                    pieces.Add(SassCompiler.Compile(file, build.Css.SourceMap));
+                {
+                    try
+                    {
+                        pieces.Add(SassCompiler.Compile(file, build.Css.SourceMap));
+                    }
+                    catch (Exception exception)
+                    {
+                        LogError($"{file}: {exception.Message}");
+                    }
+                }
 
                 break;
 
@@ -232,7 +251,12 @@ public class MateBundler
             }
 
             default:
-                pieces.AddRange(files.Select(File.ReadAllText));
+                foreach (string file in files)
+                {
+                    try { pieces.Add(File.ReadAllText(file)); }
+                    catch (Exception exception) { LogError($"{file}: {exception.Message}"); }
+                }
+
                 break;
         }
     }

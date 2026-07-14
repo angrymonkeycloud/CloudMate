@@ -9,7 +9,7 @@
       - Compile / Recompile : shown for eligible static files
       - Stop Compiling      : shown only when the selected file is already in config
       - Compress            : shown only for folders
-      - Rebuild             : shown only for .mateconfig.json
+      - Rebuild             : shown only for mateconfig.json
     VSCT cannot filter by file name, so commands are declared here and handlers
     toggle OleMenuCommand visibility/text based on selection + config state.
   -->
@@ -24,12 +24,14 @@
       Each Bitmap has its own guid and a single image slot (usedList="1").
     -->
 		<Bitmaps>
-			<Bitmap guid="guidIconCloudMate" href="Resources\CloudMate.png" usedList="1"/>
-			<Bitmap guid="guidIconCompile" href="Resources\Compile.png"   usedList="1"/>
-			<Bitmap guid="guidIconStop" href="Resources\Uncompile.png"      usedList="1"/>
-			<Bitmap guid="guidIconCompress" href="Resources\Compress.png"   usedList="1"/>
-			<Bitmap guid="guidIconUncompress" href="Resources\Uncompress.png" usedList="1"/>
-			<Bitmap guid="guidIconRebuild" href="Resources\Recompile.png"  usedList="1"/>
+			<Bitmap guid="guidIconCloudMate"   href="Resources\CloudMate.png"   usedList="1"/>
+			<Bitmap guid="guidIconCompile"     href="Resources\Compile.png"     usedList="1"/>
+			<Bitmap guid="guidIconStop"        href="Resources\Uncompile.png"   usedList="1"/>
+			<Bitmap guid="guidIconCompress"    href="Resources\Compress.png"    usedList="1"/>
+			<Bitmap guid="guidIconUncompress"  href="Resources\Uncompress.png"  usedList="1"/>
+			<Bitmap guid="guidIconRebuild"     href="Resources\Recompile.png"   usedList="1"/>
+			<Bitmap guid="guidIconCleanup"     href="Resources\Cleanup.png"     usedList="1"/>
+			<Bitmap guid="guidIconAutoconfig"  href="Resources\Autoconfig.png"  usedList="1"/>
 		</Bitmaps>
 
 		<!-- Menus -->
@@ -73,7 +75,7 @@
 				<CommandFlag>TextChanges</CommandFlag>
 				<Strings>
 					<ButtonText>Compile</ButtonText>
-					<ToolTipText>Add this file to .mateconfig.json and compile with CloudMate</ToolTipText>
+					<ToolTipText>Add this file to mateconfig.json and compile with CloudMate</ToolTipText>
 				</Strings>
 			</Button>
 
@@ -84,7 +86,7 @@
 				<CommandFlag>DefaultInvisible</CommandFlag>
 				<Strings>
 					<ButtonText>Stop Compiling</ButtonText>
-					<ToolTipText>Remove this file from .mateconfig.json</ToolTipText>
+					<ToolTipText>Remove this file from mateconfig.json</ToolTipText>
 				</Strings>
 			</Button>
 
@@ -95,7 +97,7 @@
 				<CommandFlag>DefaultInvisible</CommandFlag>
 				<Strings>
 					<ButtonText>Compress</ButtonText>
-					<ToolTipText>Add this folder to .mateconfig.json for CloudMate image compression</ToolTipText>
+					<ToolTipText>Add this folder to mateconfig.json for CloudMate image compression</ToolTipText>
 				</Strings>
 			</Button>
 
@@ -106,7 +108,7 @@
 				<CommandFlag>DefaultInvisible</CommandFlag>
 				<Strings>
 					<ButtonText>Stop Compressing</ButtonText>
-					<ToolTipText>Remove this folder from .mateconfig.json image compression</ToolTipText>
+					<ToolTipText>Remove this folder from mateconfig.json image compression</ToolTipText>
 				</Strings>
 			</Button>
 
@@ -117,7 +119,29 @@
 				<CommandFlag>DefaultInvisible</CommandFlag>
 				<Strings>
 					<ButtonText>Rebuild</ButtonText>
-					<ToolTipText>Run a one-time CloudMate rebuild (mate) for this .mateconfig.json</ToolTipText>
+					<ToolTipText>Run a one-time CloudMate rebuild (mate) for this mateconfig.json</ToolTipText>
+				</Strings>
+			</Button>
+
+			<Button guid="guidCloudMateCmdSet" id="cmdidCleanConfig" priority="0x0350" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconCleanup" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Clean Config</ButtonText>
+					<ToolTipText>Remove entries with missing input files from mateconfig.json</ToolTipText>
+				</Strings>
+			</Button>
+
+			<Button guid="guidCloudMateCmdSet" id="cmdidAutoConfigureFiles" priority="0x0360" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconAutoconfig" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Auto-Configure Files</ButtonText>
+					<ToolTipText>Scan the project and add unconfigured .ts/.less/.scss/.sass files to mateconfig.json</ToolTipText>
 				</Strings>
 			</Button>
 
@@ -151,14 +175,18 @@
 			<IDSymbol name="cmdidCompressImages"       value="0x0102"/>
 			<IDSymbol name="cmdidStopCompressing"       value="0x0107"/>
 			<IDSymbol name="cmdidBuild"                value="0x0103"/>
+			<IDSymbol name="cmdidCleanConfig"          value="0x0104"/>
+			<IDSymbol name="cmdidAutoConfigureFiles"   value="0x0105"/>
 		</GuidSymbol>
 
-		<GuidSymbol name="guidIconCloudMate" value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
-		<GuidSymbol name="guidIconCompile"   value="{E5F6A7B8-C9D0-1234-EF12-345678901234}"/>
-		<GuidSymbol name="guidIconStop"      value="{F6A7B8C9-D0E1-2345-F123-456789012345}"/>
-		<GuidSymbol name="guidIconCompress"      value="{A7B8C9D0-E1F2-3456-1234-567890123456}"/>
-		<GuidSymbol name="guidIconUncompress"    value="{C9D0E1F2-A3B4-5678-3456-789012345678}"/>
-		<GuidSymbol name="guidIconRebuild"   value="{B8C9D0E1-F2A3-4567-2345-678901234567}"/>
+		<GuidSymbol name="guidIconCloudMate"   value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
+		<GuidSymbol name="guidIconCompile"     value="{E5F6A7B8-C9D0-1234-EF12-345678901234}"/>
+		<GuidSymbol name="guidIconStop"        value="{F6A7B8C9-D0E1-2345-F123-456789012345}"/>
+		<GuidSymbol name="guidIconCompress"    value="{A7B8C9D0-E1F2-3456-1234-567890123456}"/>
+		<GuidSymbol name="guidIconUncompress"  value="{C9D0E1F2-A3B4-5678-3456-789012345678}"/>
+		<GuidSymbol name="guidIconRebuild"     value="{B8C9D0E1-F2A3-4567-2345-678901234567}"/>
+		<GuidSymbol name="guidIconCleanup"     value="{D0E1F2A3-B4C5-6789-4567-890123456789}"/>
+		<GuidSymbol name="guidIconAutoconfig"  value="{E1F2A3B4-C5D6-7890-5678-901234567890}"/>
 
 	</Symbols>
 
