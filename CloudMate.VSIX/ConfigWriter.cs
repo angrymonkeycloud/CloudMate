@@ -242,6 +242,10 @@ internal static class ConfigWriter
     private static bool HasWwwroot(string projectRoot)
         => Directory.Exists(Path.Combine(projectRoot, "wwwroot"));
 
+    /// <summary>Returns <see langword="true"/> when a <c>.csproj</c> file exists directly under the project root.</summary>
+    private static bool IsNetProject(string projectRoot)
+        => Directory.EnumerateFiles(projectRoot, "*.csproj", SearchOption.TopDirectoryOnly).Any();
+
     /// <summary>
     /// Maps a project-root-relative source path to its default output location.
     /// When a <c>wwwroot</c> exists directly under the project root, the path is placed under
@@ -253,7 +257,7 @@ internal static class ConfigWriter
     /// <param name="relativeSource">Forward-slashed source path relative to the project root.</param>
     private static string MapToOutput(string projectRoot, string relativeSource)
     {
-        if (!HasWwwroot(projectRoot))
+        if (!IsNetProject(projectRoot) && !HasWwwroot(projectRoot))
             return relativeSource;
 
         string[] segments = relativeSource.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
@@ -262,15 +266,39 @@ internal static class ConfigWriter
         // Any other path stays in place (same directory as input).
         if (segments.Length > 0 && SourceFolderNames.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
         {
-            segments = segments.Skip(1).ToArray();
-            return segments.Length == 0
-                ? "wwwroot"
-                : "wwwroot/" + string.Join("/", segments);
+            string[] remaining = segments.Skip(1).ToArray();
+
+            // If the source folder itself was added (no sub-path), keep the output path as-is.
+            if (remaining.Length == 0)
+                return relativeSource;
+
+            return "wwwroot/" + string.Join("/", remaining);
         }
 
         return relativeSource;
     }
 
+    /// <summary>
+    /// Computes the output folder for an image-compression entry.
+    /// When <see cref="MapToOutput"/> would return the same path as the input
+    /// (i.e. no wwwroot remapping applied), a <c>_compressed</c> suffix is appended
+    /// to the folder name so that compressed outputs are never written into the
+    /// same directory as the source images.
+    /// </summary>
+    private static string GetCompressOutput(string projectRoot, string relativeFolder)
+    {
+        string mapped = MapToOutput(projectRoot, relativeFolder);
+
+        if (!string.Equals(mapped, relativeFolder, StringComparison.OrdinalIgnoreCase))
+            return mapped;
+
+        // Output would be the same as input - create a sibling folder with _compressed suffix.
+        int lastSlash = relativeFolder.LastIndexOf('/');
+        string folderName = lastSlash < 0 ? relativeFolder : relativeFolder.Substring(lastSlash + 1);
+        string parentDir  = lastSlash < 0 ? string.Empty   : relativeFolder.Substring(0, lastSlash);
+        string compressedName = folderName + "_compressed";
+        return string.IsNullOrEmpty(parentDir) ? compressedName : parentDir + "/" + compressedName;
+    }
     // ─── Compile (files) ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -414,7 +442,7 @@ internal static class ConfigWriter
 
         string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
         string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
-        string relativeOutput = MapToOutput(projectRoot, relativeFolder);
+        string relativeOutput = GetCompressOutput(projectRoot, relativeFolder);
 
         JsonObject root = Load(configPath);
         JsonArray images = GetOrCreateArray(root, "images");
@@ -445,7 +473,7 @@ internal static class ConfigWriter
 
         string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
         string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
-        string relativeOutput = MapToOutput(projectRoot, relativeFolder);
+        string relativeOutput = GetCompressOutput(projectRoot, relativeFolder);
 
         JsonObject root = Load(configPath);
         if (root["images"] is not JsonArray images)
@@ -464,7 +492,7 @@ internal static class ConfigWriter
 
         string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
         string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
-        string relativeOutput = MapToOutput(projectRoot, relativeFolder);
+        string relativeOutput = GetCompressOutput(projectRoot, relativeFolder);
 
         if (configPath is null)
             return new Result(false, Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,

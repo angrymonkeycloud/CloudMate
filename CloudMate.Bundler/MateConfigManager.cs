@@ -254,17 +254,25 @@ public static class MateConfigManager
     private static bool HasWwwroot(string projectRoot)
         => Directory.Exists(Path.Combine(projectRoot, "wwwroot"));
 
+    private static bool IsNetProject(string projectRoot)
+        => Directory.EnumerateFiles(projectRoot, "*.csproj", SearchOption.TopDirectoryOnly).Any();
+
     private static string MapToOutput(string projectRoot, string relativeSource)
     {
-        if (!HasWwwroot(projectRoot))
+        if (!IsNetProject(projectRoot) && !HasWwwroot(projectRoot))
             return relativeSource;
 
         string[] segments = relativeSource.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
 
         if (segments.Length > 0 && SourceFolderNames.Contains(segments[0], StringComparer.OrdinalIgnoreCase))
         {
-            segments = segments.Skip(1).ToArray();
-            return segments.Length == 0 ? "wwwroot" : "wwwroot/" + string.Join("/", segments);
+            string[] remaining = segments.Skip(1).ToArray();
+
+            // If the source folder itself was added (no sub-path), keep the output path as-is.
+            if (remaining.Length == 0)
+                return relativeSource;
+
+            return "wwwroot/" + string.Join("/", remaining);
         }
 
         return relativeSource;

@@ -109,7 +109,7 @@ What it does:
    - `.less` / `.scss` / `.sass` → output extension becomes `.css`
    - `.ts` → output extension becomes `.js`
    - `.js` / `.css` → extension is kept; file is passed through and bundled as-is
-3. When the project has a `wwwroot` folder and the file is inside `src/` or `source/`, the output is automatically placed under `wwwroot/` with the leading `src`/`source` segment stripped (e.g. `src/styles/site.less` → `wwwroot/styles/site.css`).
+3. When the project is a .NET project (contains a `.csproj`) or has a `wwwroot` folder, and the file is inside `src/` or `source/`, the output is automatically placed under `wwwroot/` with the leading `src`/`source` segment stripped (e.g. `src/styles/site.less` → `wwwroot/styles/site.css`).
 4. Runs a one-time compile using the current configuration.
 5. Starts the always-on file watcher so subsequent saves recompile automatically.
 
@@ -144,7 +144,7 @@ What it does:
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
 2. Appends an `images` entry with a recursive glob (`folder/**/*`) as input.
-   - When the project has a `wwwroot` folder and the folder is inside `src/` or `source/`, the output destination is automatically remapped to the corresponding path under `wwwroot/` (e.g. `src/images` → `wwwroot/images`).
+   - When the project is a .NET project (contains a `.csproj`) or has a `wwwroot` folder, and the folder is inside `src/` or `source/`, the output destination is automatically remapped to the corresponding path under `wwwroot/` (e.g. `src/images` → `wwwroot/images`).
 3. Runs a one-time image compression pass for all images found in the folder.
 4. Starts the always-on watcher so new or changed images in the folder are recompressed automatically.
 
@@ -200,7 +200,7 @@ What it does:
 1. **Cleans stale entries first** — scans every `files` and `images` entry and removes any whose source path no longer exists on disk (same logic as **Clean Config**). This ensures broken inputs are never left behind.
 2. Recursively scans the project root for compilable source files: `.ts`, `.less`, `.scss`, `.sass`.
 3. Skips directories that are not source roots: `bin`, `obj`, `node_modules`, `.git`, `.vs`, `wwwroot`.
-4. For each discovered file that is **not yet** registered in `mateconfig.json`, adds a `files` entry with the correct output path — following the same `src/` → `wwwroot/` mapping used by **Compile**.
+4. For each discovered file that is **not yet** registered in `mateconfig.json`, adds a `files` entry with the correct output path — following the same `src/` → `wwwroot/` mapping used by **Compile** (applied when the project is a .NET project or has a `wwwroot` folder).
 5. Logs a summary of both phases: how many stale entries were removed and how many new files were added.
 
 Use this on an existing project to clean and register all source files at once without adding them one by one.
@@ -219,7 +219,7 @@ No CloudMate commands appear for:
 
 ## Output Paths and the `src` / `source` Folder Convention
 
-When a `.NET` project contains a `wwwroot` folder, CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/`, stripping the leading `src` / `source` segment:
+CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/` whenever the project is a .NET project (contains a `.csproj`) **or** already has a `wwwroot` folder. The leading `src` / `source` segment is stripped:
 
 | Source file | Output file |
 |---|---|
@@ -228,7 +228,7 @@ When a `.NET` project contains a `wwwroot` folder, CloudMate automatically maps 
 | `source/images/logo.png` | `wwwroot/images/logo.png` (compressed) |
 | `src/images/` *(folder)* | `wwwroot/images/` *(compressed)* |
 
-Files outside `src/` or `source/` are output next to the source file (no remapping). Projects without a `wwwroot` folder are also left as-is.
+Files outside `src/` or `source/` are output next to the source file (no remapping). If neither condition applies (no `.csproj` and no `wwwroot`), paths are kept as-is.
 
 ## Output
 
@@ -327,7 +327,7 @@ What it does:
    - `.less` / `.scss` / `.sass` → output extension becomes `.css`
    - `.ts` → output extension becomes `.js`
    - `.js` / `.css` → extension is kept; file is passed through and bundled as-is
-3. When the project has a `wwwroot` folder and the file is inside `src/` or `source/`, the output is automatically placed under `wwwroot/` with the leading `src`/`source` segment stripped (e.g. `src/styles/site.less` → `wwwroot/styles/site.css`).
+3. When the project is a .NET project (contains a `.csproj`) or has a `wwwroot` folder, and the file is inside `src/` or `source/`, the output is automatically placed under `wwwroot/` with the leading `src`/`source` segment stripped (e.g. `src/styles/site.less` → `wwwroot/styles/site.css`).
 4. Runs a one-time compile using the current configuration.
 5. Starts the always-on file watcher so subsequent saves recompile automatically.
 
@@ -368,7 +368,7 @@ What it does:
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
 2. Appends an `images` entry with a recursive glob (`folder/**/*`) as input.
-   - When the project has a `wwwroot` folder and the folder is inside `src/` or `source/`, the output destination is automatically remapped to the corresponding path under `wwwroot/` (e.g. `src/images` → `wwwroot/images`).
+   - When the project is a .NET project (contains a `.csproj`) or has a `wwwroot` folder, and the folder is inside `src/` or `source/`, the output destination is automatically remapped to the corresponding path under `wwwroot/` (e.g. `src/images` → `wwwroot/images`).
 3. Runs a one-time image compression pass for all images found in the folder.
 4. Starts the always-on watcher so new or changed images in the folder are recompressed automatically.
 
@@ -416,7 +416,7 @@ No CloudMate commands appear for:
 
 ## Output Paths and the `src` / `source` Folder Convention
 
-When a `.NET` project contains a `wwwroot` folder, CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/`, stripping the leading `src` / `source` segment:
+CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/` whenever the project is a .NET project (contains a `.csproj`) **or** already has a `wwwroot` folder. The leading `src` / `source` segment is stripped:
 
 | Source file | Output file |
 |---|---|
@@ -425,7 +425,7 @@ When a `.NET` project contains a `wwwroot` folder, CloudMate automatically maps 
 | `source/images/logo.png` | `wwwroot/images/logo.png` (compressed) |
 | `src/images/` *(folder)* | `wwwroot/images/` *(compressed)* |
 
-Files outside `src/` or `source/` are output next to the source file (no remapping). Projects without a `wwwroot` folder are also left as-is.
+Files outside `src/` or `source/` are output next to the source file (no remapping). If neither condition applies (no `.csproj` and no `wwwroot`), paths are kept as-is.
 
 ## Output
 

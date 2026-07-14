@@ -548,6 +548,20 @@ mate -h, --help       # print help
 > **`--autoconfig`** always runs a clean pass first, so stale entries with deleted source files are
 > removed before new files are discovered and registered.
 
+### Output Paths and the `src` / `source` Folder Convention
+
+When `--autoconfig` (or the Visual Studio extension) generates output paths, it applies this rule: source files under `src/` or `source/` are mapped to a corresponding path under `wwwroot/` whenever the project is a .NET project (contains a `.csproj`) **or** already has a `wwwroot` folder. The leading `src` / `source` segment is stripped:
+
+| Source file | Auto-generated output |
+|---|---|
+| `src/styles/site.less` | `wwwroot/styles/site.css` |
+| `src/scripts/app.ts` | `wwwroot/scripts/app.js` |
+| `source/images/logo.png` | `wwwroot/images/logo.png` |
+
+Files outside `src/` or `source/` keep their original relative path (output lands next to the source). If neither condition applies (no `.csproj` and no `wwwroot`), all paths are kept as-is.
+
+> **Note:** If the source folder itself (e.g. `src`) is added as a compilation root, output is **not** remapped to `wwwroot` — only files nested inside it are remapped.
+
 ---
 
 ## Project Structure
