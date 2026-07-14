@@ -22,6 +22,7 @@ internal static class MateRunner
     private static FileSystemWatcher? _configWatcher;
     private static string? _configWatcherPath;
     private static DateTime _lastConfigReloadUtc;
+    private static bool _configDeleted;
 
     public static bool IsWatching
     {
@@ -57,13 +58,9 @@ internal static class MateRunner
             if (_watchProcess is { HasExited: false })
             {
                 _watchStopRequested = true;
-                try { _watchProcess.Kill(); }
-                catch { }
-                finally
-                {
-                    _watchProcess.Dispose();
-                    _watchProcess = null;
-                }
+                KillProcessTree(_watchProcess);
+                _watchProcess.Dispose();
+                _watchProcess = null;
             }
 
             _watchStopRequested = false;
@@ -209,20 +206,13 @@ internal static class MateRunner
         lock (_watchLock)
         {
             _watchStopRequested = true;
+            _configDeleted = false;
 
             if (_watchProcess is not null)
             {
-                try
-                {
-                    if (!_watchProcess.HasExited)
-                        _watchProcess.Kill(); // entireProcessTree parameter not available on .NET Framework 4.7.2
-                }
-                catch { /* already exited */ }
-                finally
-                {
-                    _watchProcess.Dispose();
-                    _watchProcess = null;
-                }
+                KillProcessTree(_watchProcess);
+                _watchProcess.Dispose();
+                _watchProcess = null;
             }
 
             DisposeConfigWatcher();
@@ -272,37 +262,33 @@ internal static class MateRunner
 
             logOutput = _watchOutput;
 
-            // Config deleted — stop the watch rather than trying to restart it.
+            // Config deleted — kill the running process but stay armed so a re-creation restarts it.
             if (!File.Exists(Path.Combine(_watchWorkingDirectory!, ConfigWriter.ConfigFileName)))
             {
                 noticeAfterLock = "[CloudMate] mateconfig.json deleted. watch stopped.";
-                _watchStopRequested = true;
+                _configDeleted = true;
 
                 if (_watchProcess is { HasExited: false })
                 {
-                    try { _watchProcess.Kill(); }
-                    catch { }
-                    finally
-                    {
-                        _watchProcess.Dispose();
-                        _watchProcess = null;
-                    }
+                    KillProcessTree(_watchProcess);
+                    _watchProcess.Dispose();
+                    _watchProcess = null;
                 }
             }
             else
             {
-                noticeAfterLock = "[CloudMate] mateconfig.json changed. reloading watch...";
+                // Config created or changed — clear any previous deletion state and (re)start.
+                _configDeleted = false;
+                noticeAfterLock = _watchProcess is { HasExited: false }
+                    ? "[CloudMate] mateconfig.json changed. reloading watch..."
+                    : "[CloudMate] mateconfig.json created. starting watch...";
 
                 if (_watchProcess is { HasExited: false })
                 {
                     _watchStopRequested = true;
-                    try { _watchProcess.Kill(); }
-                    catch { }
-                    finally
-                    {
-                        _watchProcess.Dispose();
-                        _watchProcess = null;
-                    }
+                    KillProcessTree(_watchProcess);
+                    _watchProcess.Dispose();
+                    _watchProcess = null;
                 }
 
                 _watchStopRequested = false;
@@ -316,6 +302,42 @@ internal static class MateRunner
 
         if (logAfterLock is not null)
             logOutput?.Invoke(logAfterLock);
+    }
+
+    /// <summary>
+    /// Kills a process and its entire child tree. On .NET Framework 4.7.2 Process.Kill()
+    /// has no entireProcessTree overload, and 'mate' may be launched via a cmd shim whose
+    /// child dotnet process would otherwise survive and keep compiling.
+    /// </summary>
+    private static void KillProcessTree(Process process)
+    {
+        try
+        {
+            if (process.HasExited)
+                return;
+
+            using Process taskkill = new()
+            {
+                StartInfo = new ProcessStartInfo("taskkill", $"/PID {process.Id} /T /F")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+
+            taskkill.Start();
+            taskkill.WaitForExit(5000);
+        }
+        catch { /* best effort */ }
+
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(); // fallback: kill at least the root process
+        }
+        catch { /* already exited */ }
     }
 
     private static void DisposeConfigWatcher()
