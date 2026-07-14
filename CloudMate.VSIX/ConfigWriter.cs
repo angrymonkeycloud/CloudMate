@@ -79,7 +79,7 @@ internal static class ConfigWriter
         return configPath;
     }
 
-    /// <summary>Loads the config file as a mutable <see cref="JsonObject"/> (empty object on parse failure).</summary>
+    /// <summary>Loads the config file as a mutable <see cref="JsonObject"/> (empty object on any read or parse failure).</summary>
     private static JsonObject Load(string configPath)
     {
         try
@@ -88,6 +88,12 @@ internal static class ConfigWriter
 
             if (JsonNode.Parse(content) is JsonObject root)
                 return root;
+        }
+        catch (IOException)
+        {
+            // File is being written by a background thread (e.g. AddCompileFile called from Task.Run
+            // while BeforeQueryStatus reads it on the UI thread). Return an empty object so QueryStatus
+            // degrades gracefully instead of throwing and letting VS permanently disable the command.
         }
         catch (JsonException)
         {
@@ -99,6 +105,8 @@ internal static class ConfigWriter
     }
 
     /// <summary>Persists a mutated config object back to disk with indented formatting.
+    /// Uses an atomic temp-file + replace so concurrent readers on the UI thread never
+    /// see a partially-written file (which would throw IOException or produce corrupt JSON).
     /// Empty arrays are omitted so the file stays clean.</summary>
     private static void Save(string configPath, JsonObject root)
     {
@@ -109,7 +117,23 @@ internal static class ConfigWriter
                 root.Remove(key);
         }
 
-        File.WriteAllText(configPath, root.ToJsonString(WriteOptions));
+        string json = root.ToJsonString(WriteOptions);
+
+        // Write to a sibling temp file, then atomically replace the real config.
+        // This ensures the config is never in a partially-written state.
+        string tempPath = configPath + ".tmp";
+        try
+        {
+            File.WriteAllText(tempPath, json);
+            File.Replace(tempPath, configPath, null);
+        }
+        catch
+        {
+            // File.Replace can fail on some network shares or when the destination is locked.
+            // Fall back to a direct write, which is still safer than losing the data.
+            try { File.Delete(tempPath); } catch { }
+            File.WriteAllText(configPath, json);
+        }
     }
 
     /// <summary>Gets an existing array property or creates and attaches a new one.</summary>
@@ -400,6 +424,70 @@ internal static class ConfigWriter
 
         Save(configPath, root);
         return new Result(true, configPath, relativeInput, relativeOutput);
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="sourceFolder"/> already exists in <c>images</c> input entries
+    /// of the project's <c>.mateconfig.json</c>.
+    /// </summary>
+    public static bool HasCompressFolder(string projectRoot, string sourceFolder)
+    {
+        string? configPath = GetConfigPath(projectRoot);
+        if (configPath is null)
+            return false;
+
+        string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
+        string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
+        string relativeOutput = MapToOutput(projectRoot, relativeFolder);
+
+        JsonObject root = Load(configPath);
+        if (root["images"] is not JsonArray images)
+            return false;
+
+        return EntryExists(images, relativeInput, relativeOutput);
+    }
+
+    /// <summary>
+    /// Removes all compress entries whose <c>input</c> matches <paramref name="sourceFolder"/>.
+    /// Returns a result indicating whether anything was removed.
+    /// </summary>
+    public static Result RemoveCompressFolder(string projectRoot, string sourceFolder)
+    {
+        string? configPath = GetConfigPath(projectRoot);
+
+        string relativeFolder = ToRelative(projectRoot, sourceFolder).TrimEnd('/');
+        string relativeInput = string.IsNullOrEmpty(relativeFolder) ? "**/*" : $"{relativeFolder}/**/*";
+        string relativeOutput = MapToOutput(projectRoot, relativeFolder);
+
+        if (configPath is null)
+            return new Result(false, Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
+                "This folder is not configured for compression.");
+
+        JsonObject root = Load(configPath);
+        if (root["images"] is not JsonArray images)
+            return new Result(false, configPath, relativeInput, relativeOutput,
+                "This folder is not configured for compression.");
+
+        int removed = 0;
+        for (int i = images.Count - 1; i >= 0; i--)
+        {
+            if (images[i] is not JsonObject entry)
+                continue;
+
+            if (ValueEquals(entry["input"], relativeInput))
+            {
+                images.RemoveAt(i);
+                removed++;
+            }
+        }
+
+        if (removed == 0)
+            return new Result(false, configPath, relativeInput, relativeOutput,
+                "This folder is not configured for compression.");
+
+        Save(configPath, root);
+        return new Result(true, configPath, relativeInput, relativeOutput,
+            removed == 1 ? "Removed from mateconfig.json." : $"Removed {removed} compress entries from mateconfig.json.");
     }
 
     // ─── Shared entry helpers ──────────────────────────────────────────────────

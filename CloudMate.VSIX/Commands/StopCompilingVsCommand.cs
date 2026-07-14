@@ -39,9 +39,16 @@ internal sealed class StopCompilingVsCommand : VsCommandBase
             return;
         }
 
-        string? path = GetSelectedPath();
-        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
-        cmd.Visible = root is not null && ConfigWriter.HasCompileFile(root, path!);
+        try
+        {
+            string? path = GetSelectedPath();
+            string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+            cmd.Visible = root is not null && ConfigWriter.HasCompileFile(root, path!);
+        }
+        catch
+        {
+            cmd.Visible = false;
+        }
     }
 
     private void Execute(object sender, EventArgs e)

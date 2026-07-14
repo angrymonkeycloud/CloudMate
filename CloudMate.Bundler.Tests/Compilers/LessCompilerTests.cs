@@ -56,4 +56,26 @@ public class LessCompilerTests
 
         Assert.Throws<InvalidOperationException>(() => LessCompiler.Compile(entry, sourceMap: false));
     }
+
+    [Fact]
+    public void Compile_CssMinFunction_PassesThroughUnchanged()
+    {
+        using TempDirectory dir = new();
+        string entry = dir.WriteFile("min.less", ".search { width: min(180px, 100%); }\n");
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        Assert.Contains("min(180px, 100%)", css);
+    }
+
+    [Fact]
+    public void Compile_CssMinFunctionWithCalc_PassesThroughUnchanged()
+    {
+        using TempDirectory dir = new();
+        string entry = dir.WriteFile("min-calc.less", ".dropdown { max-width: min(280px, calc(100vw - 16px)); }\n");
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        Assert.Contains("min(280px, calc(100vw - 16px))", css);
+    }
 }

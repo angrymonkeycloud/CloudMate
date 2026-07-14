@@ -42,9 +42,17 @@ internal sealed class CompileVsCommand : VsCommandBase
         }
 
         cmd.Visible = true;
-        string? path = GetSelectedPath();
-        string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
-        cmd.Text = (root is not null && ConfigWriter.HasCompileFile(root, path!)) ? "Recompile" : "Compile";
+        
+        try
+        {
+            string? path = GetSelectedPath();
+            string? root = path is not null ? ConfigWriter.FindProjectRoot(path) : null;
+            cmd.Text = (root is not null && ConfigWriter.HasCompileFile(root, path!)) ? "Recompile" : "Compile";
+        }
+        catch
+        {
+            cmd.Text = "Compile";
+        }
     }
 
     private void Execute(object sender, EventArgs e)

@@ -66,6 +66,13 @@
     <VSCTCompile Include="CloudMatePackage.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
+    <!-- Icon bitmaps compiled into the VSCT menu resource; must be 16x16 PNG strips -->
+    <None Include="Resources\CloudMate.png" />
+    <None Include="Resources\Compile.png" />
+    <None Include="Resources\Compress.png" />
+    <None Include="Resources\Uncompress.png" />
+    <None Include="Resources\Recompile.png" />
+    <None Include="Resources\Uncompile.png" />
   </ItemGroup>
 
 </Project>

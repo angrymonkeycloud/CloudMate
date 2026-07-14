@@ -2,7 +2,7 @@
 <CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
               xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-  <!--
+	<!--
     CloudMate command table.
     Declares a "CloudMate" submenu on the Solution Explorer item, folder, and project
     context menus. Command visibility is decided at runtime (BeforeQueryStatus):
@@ -14,138 +14,152 @@
     toggle OleMenuCommand visibility/text based on selection + config state.
   -->
 
-  <Extern href="stdidcmd.h"/>
-  <Extern href="vsshlids.h"/>
+	<Extern href="stdidcmd.h"/>
+	<Extern href="vsshlids.h"/>
 
-  <Commands package="guidCloudMatePackage">
+	<Commands package="guidCloudMatePackage">
 
-    <!--
+		<!--
       Icons: one separate PNG per command, compiled into the menu resource.
       Each Bitmap has its own guid and a single image slot (usedList="1").
     -->
-    <Bitmaps>
-      <Bitmap guid="guidIconCloudMate" href="Resources\CloudMate16.png" usedList="1"/>
-      <Bitmap guid="guidIconCompile"   href="Resources\Compile16.png"   usedList="1"/>
-      <Bitmap guid="guidIconStop"      href="Resources\Stop16.png"      usedList="1"/>
-      <Bitmap guid="guidIconCompress"  href="Resources\Compress16.png"  usedList="1"/>
-      <Bitmap guid="guidIconRebuild"   href="Resources\Rebuild16.png"   usedList="1"/>
-    </Bitmaps>
+		<Bitmaps>
+			<Bitmap guid="guidIconCloudMate" href="Resources\CloudMate.png" usedList="1"/>
+			<Bitmap guid="guidIconCompile" href="Resources\Compile.png"   usedList="1"/>
+			<Bitmap guid="guidIconStop" href="Resources\Uncompile.png"      usedList="1"/>
+			<Bitmap guid="guidIconCompress" href="Resources\Compress.png"   usedList="1"/>
+			<Bitmap guid="guidIconUncompress" href="Resources\Uncompress.png" usedList="1"/>
+			<Bitmap guid="guidIconRebuild" href="Resources\Recompile.png"  usedList="1"/>
+		</Bitmaps>
 
-    <!-- Menus -->
-    <Menus>
-      <Menu guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100" type="Menu">
-        <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroup"/>
-        <Icon guid="guidIconCloudMate" id="1"/>
-        <CommandFlag>IconAndText</CommandFlag>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <Strings>
-          <ButtonText>CloudMate</ButtonText>
-          <CommandName>CloudMate</CommandName>
-        </Strings>
-      </Menu>
-    </Menus>
+		<!-- Menus -->
+		<Menus>
+			<Menu guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100" type="Menu">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroup"/>
+				<Icon guid="guidIconCloudMate" id="1"/>
+				<CommandFlag>IconAndText</CommandFlag>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<Strings>
+					<ButtonText>CloudMate</ButtonText>
+					<CommandName>CloudMate</CommandName>
+				</Strings>
+			</Menu>
+		</Menus>
 
-    <!-- Groups -->
-    <Groups>
-      <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroup" priority="0x0100">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
-      </Group>
-      <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder" priority="0x0100">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_FOLDERNODE"/>
-      </Group>
-      <Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj" priority="0x0100">
-        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE"/>
-      </Group>
-      <Group guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup" priority="0x0100">
-        <Parent guid="guidCloudMateCmdSet" id="CloudMateSubMenu"/>
-      </Group>
-    </Groups>
+		<!-- Groups -->
+		<Groups>
+			<Group guid="guidCloudMateCmdSet" id="guidCloudMateGroup" priority="0x0100">
+				<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+			</Group>
+			<Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder" priority="0x0100">
+				<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_FOLDERNODE"/>
+			</Group>
+			<Group guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj" priority="0x0100">
+				<Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE"/>
+			</Group>
+			<Group guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup" priority="0x0100">
+				<Parent guid="guidCloudMateCmdSet" id="CloudMateSubMenu"/>
+			</Group>
+		</Groups>
 
-    <!-- Buttons -->
-    <Buttons>
+		<!-- Buttons -->
+		<Buttons>
 
-      <Button guid="guidCloudMateCmdSet" id="cmdidCompile" priority="0x0100" type="Button">
-        <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidIconCompile" id="1"/>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <CommandFlag>DefaultInvisible</CommandFlag>
-        <CommandFlag>TextChanges</CommandFlag>
-        <Strings>
-          <ButtonText>Compile</ButtonText>
-          <ToolTipText>Add this file to .mateconfig.json and compile with CloudMate</ToolTipText>
-        </Strings>
-      </Button>
+			<Button guid="guidCloudMateCmdSet" id="cmdidCompile" priority="0x0100" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconCompile" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<CommandFlag>TextChanges</CommandFlag>
+				<Strings>
+					<ButtonText>Compile</ButtonText>
+					<ToolTipText>Add this file to .mateconfig.json and compile with CloudMate</ToolTipText>
+				</Strings>
+			</Button>
 
-      <Button guid="guidCloudMateCmdSet" id="cmdidStopCompiling" priority="0x0150" type="Button">
-        <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidIconStop" id="1"/>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <CommandFlag>DefaultInvisible</CommandFlag>
-        <Strings>
-          <ButtonText>Stop Compiling</ButtonText>
-          <ToolTipText>Remove this file from .mateconfig.json</ToolTipText>
-        </Strings>
-      </Button>
+			<Button guid="guidCloudMateCmdSet" id="cmdidStopCompiling" priority="0x0150" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconStop" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Stop Compiling</ButtonText>
+					<ToolTipText>Remove this file from .mateconfig.json</ToolTipText>
+				</Strings>
+			</Button>
 
-      <Button guid="guidCloudMateCmdSet" id="cmdidCompressImages" priority="0x0200" type="Button">
-        <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidIconCompress" id="1"/>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <CommandFlag>DefaultInvisible</CommandFlag>
-        <Strings>
-          <ButtonText>Compress</ButtonText>
-          <ToolTipText>Add this folder to .mateconfig.json for CloudMate image compression</ToolTipText>
-        </Strings>
-      </Button>
+			<Button guid="guidCloudMateCmdSet" id="cmdidCompressImages" priority="0x0200" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconCompress" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Compress</ButtonText>
+					<ToolTipText>Add this folder to .mateconfig.json for CloudMate image compression</ToolTipText>
+				</Strings>
+			</Button>
 
-      <Button guid="guidCloudMateCmdSet" id="cmdidBuild" priority="0x0300" type="Button">
-        <Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
-        <Icon guid="guidIconRebuild" id="1"/>
-        <CommandFlag>DynamicVisibility</CommandFlag>
-        <CommandFlag>DefaultInvisible</CommandFlag>
-        <Strings>
-          <ButtonText>Rebuild</ButtonText>
-          <ToolTipText>Run a one-time CloudMate rebuild (mate) for this .mateconfig.json</ToolTipText>
-        </Strings>
-      </Button>
+			<Button guid="guidCloudMateCmdSet" id="cmdidStopCompressing" priority="0x0250" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconUncompress" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Stop Compressing</ButtonText>
+					<ToolTipText>Remove this folder from .mateconfig.json image compression</ToolTipText>
+				</Strings>
+			</Button>
 
-    </Buttons>
+			<Button guid="guidCloudMateCmdSet" id="cmdidBuild" priority="0x0300" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconRebuild" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Rebuild</ButtonText>
+					<ToolTipText>Run a one-time CloudMate rebuild (mate) for this .mateconfig.json</ToolTipText>
+				</Strings>
+			</Button>
 
-  </Commands>
+		</Buttons>
 
-  <!-- Duplicate placements so folder/project nodes also get the submenu -->
-  <CommandPlacements>
-    <CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100">
-      <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder"/>
-    </CommandPlacement>
-    <CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100">
-      <Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj"/>
-    </CommandPlacement>
-  </CommandPlacements>
+	</Commands>
 
-  <!-- Symbols -->
-  <Symbols>
+	<!-- Duplicate placements so folder/project nodes also get the submenu -->
+	<CommandPlacements>
+		<CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100">
+			<Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupFolder"/>
+		</CommandPlacement>
+		<CommandPlacement guid="guidCloudMateCmdSet" id="CloudMateSubMenu" priority="0x0100">
+			<Parent guid="guidCloudMateCmdSet" id="guidCloudMateGroupProj"/>
+		</CommandPlacement>
+	</CommandPlacements>
 
-    <GuidSymbol name="guidCloudMatePackage" value="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"/>
+	<!-- Symbols -->
+	<Symbols>
 
-    <GuidSymbol name="guidCloudMateCmdSet" value="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}">
-      <IDSymbol name="CloudMateSubMenu"          value="0x1000"/>
-      <IDSymbol name="guidCloudMateGroup"        value="0x1100"/>
-      <IDSymbol name="guidCloudMateGroupFolder"  value="0x1101"/>
-      <IDSymbol name="guidCloudMateGroupProj"    value="0x1102"/>
-      <IDSymbol name="guidCloudMateSubMenuGroup" value="0x1200"/>
-      <IDSymbol name="cmdidCompile"              value="0x0101"/>
-      <IDSymbol name="cmdidStopCompiling"        value="0x0106"/>
-      <IDSymbol name="cmdidCompressImages"       value="0x0102"/>
-      <IDSymbol name="cmdidBuild"                value="0x0103"/>
-    </GuidSymbol>
+		<GuidSymbol name="guidCloudMatePackage" value="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"/>
 
-    <GuidSymbol name="guidIconCloudMate" value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
-    <GuidSymbol name="guidIconCompile"   value="{E5F6A7B8-C9D0-1234-EF12-345678901234}"/>
-    <GuidSymbol name="guidIconStop"      value="{F6A7B8C9-D0E1-2345-F123-456789012345}"/>
-    <GuidSymbol name="guidIconCompress"  value="{A7B8C9D0-E1F2-3456-1234-567890123456}"/>
-    <GuidSymbol name="guidIconRebuild"   value="{B8C9D0E1-F2A3-4567-2345-678901234567}"/>
+		<GuidSymbol name="guidCloudMateCmdSet" value="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}">
+			<IDSymbol name="CloudMateSubMenu"          value="0x1000"/>
+			<IDSymbol name="guidCloudMateGroup"        value="0x1100"/>
+			<IDSymbol name="guidCloudMateGroupFolder"  value="0x1101"/>
+			<IDSymbol name="guidCloudMateGroupProj"    value="0x1102"/>
+			<IDSymbol name="guidCloudMateSubMenuGroup" value="0x1200"/>
+			<IDSymbol name="cmdidCompile"              value="0x0101"/>
+			<IDSymbol name="cmdidStopCompiling"        value="0x0106"/>
+			<IDSymbol name="cmdidCompressImages"       value="0x0102"/>
+			<IDSymbol name="cmdidStopCompressing"       value="0x0107"/>
+			<IDSymbol name="cmdidBuild"                value="0x0103"/>
+		</GuidSymbol>
 
-  </Symbols>
+		<GuidSymbol name="guidIconCloudMate" value="{D4E5F6A7-B8C9-0123-DEF1-234567890123}"/>
+		<GuidSymbol name="guidIconCompile"   value="{E5F6A7B8-C9D0-1234-EF12-345678901234}"/>
+		<GuidSymbol name="guidIconStop"      value="{F6A7B8C9-D0E1-2345-F123-456789012345}"/>
+		<GuidSymbol name="guidIconCompress"      value="{A7B8C9D0-E1F2-3456-1234-567890123456}"/>
+		<GuidSymbol name="guidIconUncompress"    value="{C9D0E1F2-A3B4-5678-3456-789012345678}"/>
+		<GuidSymbol name="guidIconRebuild"   value="{B8C9D0E1-F2A3-4567-2345-678901234567}"/>
+
+	</Symbols>
 
 </CommandTable>

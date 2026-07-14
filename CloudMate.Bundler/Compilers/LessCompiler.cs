@@ -96,8 +96,14 @@ internal static class LessCompiler
         };
 
         var __cm_less_plugin = {
-            install: function (lessInstance, pluginManager) {
+            install: function (lessInstance, pluginManager, functions) {
                 pluginManager.addFileManager(__cm_less_fileManager);
+
+                // CSS math functions must pass through untouched; returning null from a custom
+                // function makes less.js emit the original call literally instead of evaluating it.
+                functions.add('min', function () { return null; });
+                functions.add('max', function () { return null; });
+                functions.add('clamp', function () { return null; });
             }
         };
 
@@ -109,6 +115,7 @@ internal static class LessCompiler
                 filename: request.filename,
                 syncImport: true,
                 javascriptEnabled: false,
+                math: 'parens-division',
                 plugins: [__cm_less_plugin]
             };
 

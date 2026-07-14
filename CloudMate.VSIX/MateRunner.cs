@@ -38,6 +38,9 @@ internal static class MateRunner
     /// </summary>
     public static void EnsureWatch(string workingDirectory, Action<string> output, Action<string> error)
     {
+        string? logAfterLock = null;
+        Action<string>? logCallback = null;
+
         lock (_watchLock)
         {
             _watchWorkingDirectory = workingDirectory;
@@ -54,7 +57,8 @@ internal static class MateRunner
             if (_watchProcess is { HasExited: false })
             {
                 _watchStopRequested = true;
-                try { _watchProcess.Kill(); } catch { }
+                try { _watchProcess.Kill(); }
+                catch { }
                 finally
                 {
                     _watchProcess.Dispose();
@@ -64,8 +68,13 @@ internal static class MateRunner
 
             _watchStopRequested = false;
             EnsureConfigWatcher(workingDirectory);
-            StartWatchInternal();
+            logAfterLock = StartWatchInternal();
+            logCallback = output;
         }
+
+        // Emit log AFTER the lock is released so OutputLine never blocks while the lock is held.
+        if (logAfterLock is not null)
+            logCallback?.Invoke(logAfterLock);
     }
 
     /// <summary>Runs <c>mate [args]</c> in <paramref name="workingDirectory"/> and streams output to <paramref name="output"/>.</summary>
@@ -78,7 +87,7 @@ internal static class MateRunner
         using Process proc = new() { StartInfo = psi };
 
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) output(e.Data); };
-        proc.ErrorDataReceived  += (_, e) => { if (e.Data is not null) error(e.Data); };
+        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) error(e.Data); };
 
         proc.Start();
         proc.BeginOutputReadLine();
@@ -93,10 +102,11 @@ internal static class MateRunner
     public static void StartWatch(string workingDirectory, Action<string> output, Action<string> error)
         => EnsureWatch(workingDirectory, output, error);
 
-    private static void StartWatchInternal()
+    // Returns a log line to emit AFTER the lock is released, or null.
+    private static string? StartWatchInternal()
     {
         if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
-            return;
+            return null;
 
         string watchDirectory = _watchWorkingDirectory!;
         string exe = FindMate();
@@ -104,19 +114,26 @@ internal static class MateRunner
 
         Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) _watchOutput(e.Data); };
-        proc.ErrorDataReceived  += (_, e) => { if (e.Data is not null) _watchError(e.Data); };
+        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) _watchError(e.Data); };
         proc.Exited += (_, _) => OnWatchExited();
 
         proc.Start();
         proc.BeginOutputReadLine();
         proc.BeginErrorReadLine();
 
-        _watchOutput($"[CloudMate] watch started in '{_watchWorkingDirectory}'.");
         _watchProcess = proc;
+        // Return the message; caller must emit it AFTER releasing _watchLock.
+        return $"[CloudMate] watch started in '{_watchWorkingDirectory}'.";
     }
 
     private static void OnWatchExited()
     {
+        string? logAfterLock = null;
+        string? errorAfterLock = null;
+        Action<string>? logOutput = null;
+        Action<string>? logError = null;
+        string? retryErrorAfterLock = null;
+
         lock (_watchLock)
         {
             _watchProcess?.Dispose();
@@ -128,33 +145,51 @@ internal static class MateRunner
             if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
                 return;
 
-            _watchError("[CloudMate] watch exited unexpectedly. restarting...");
+            logOutput = _watchOutput;
+            logError = _watchError;
+            errorAfterLock = "[CloudMate] watch exited unexpectedly. restarting...";
 
             try
             {
-                StartWatchInternal();
+                logAfterLock = StartWatchInternal();
             }
             catch (Exception ex)
             {
-                _watchError($"[CloudMate] watch restart failed: {ex.Message}");
-
-                // Retry quickly; this keeps watch self-healing and near-instant on transient failures.
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(500);
-                    lock (_watchLock)
-                    {
-                        if (!_watchStopRequested && _watchProcess is null)
-                        {
-                            try { StartWatchInternal(); }
-                            catch (Exception retryEx)
-                            {
-                                _watchError($"[CloudMate] watch restart failed again: {retryEx.Message}");
-                            }
-                        }
-                    }
-                });
+                retryErrorAfterLock = $"[CloudMate] watch restart failed: {ex.Message}";
             }
+        }
+
+        // Emit all log lines AFTER the lock is released.
+        if (errorAfterLock is not null) logError?.Invoke(errorAfterLock);
+        if (logAfterLock is not null) logOutput?.Invoke(logAfterLock);
+
+        if (retryErrorAfterLock is not null)
+        {
+            logError?.Invoke(retryErrorAfterLock);
+
+            // Retry quickly; this keeps watch self-healing and near-instant on transient failures.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                string? retryLog = null;
+                string? retryErr = null;
+                Action<string>? retryOutput = null;
+                Action<string>? retryError = null;
+
+                lock (_watchLock)
+                {
+                    if (!_watchStopRequested && _watchProcess is null)
+                    {
+                        retryOutput = _watchOutput;
+                        retryError = _watchError;
+                        try { retryLog = StartWatchInternal(); }
+                        catch (Exception retryEx) { retryErr = $"[CloudMate] watch restart failed again: {retryEx.Message}"; }
+                    }
+                }
+
+                if (retryLog is not null) retryOutput?.Invoke(retryLog);
+                if (retryErr is not null) retryError?.Invoke(retryErr);
+            });
         }
     }
 
@@ -210,6 +245,10 @@ internal static class MateRunner
 
     private static void ReloadWatchOnConfigChanged()
     {
+        string? logAfterLock = null;
+        string? noticeAfterLock = null;
+        Action<string>? logOutput = null;
+
         lock (_watchLock)
         {
             if (_watchStopRequested || string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
@@ -221,12 +260,14 @@ internal static class MateRunner
                 return;
             _lastConfigReloadUtc = now;
 
-            _watchOutput("[CloudMate] mateconfig.json changed. reloading watch...");
+            noticeAfterLock = "[CloudMate] mateconfig.json changed. reloading watch...";
+            logOutput = _watchOutput;
 
             if (_watchProcess is { HasExited: false })
             {
                 _watchStopRequested = true;
-                try { _watchProcess.Kill(); } catch { }
+                try { _watchProcess.Kill(); }
+                catch { }
                 finally
                 {
                     _watchProcess.Dispose();
@@ -235,8 +276,15 @@ internal static class MateRunner
             }
 
             _watchStopRequested = false;
-            StartWatchInternal();
+            logAfterLock = StartWatchInternal();
         }
+
+        // Emit log lines AFTER the lock is released so OutputLine never blocks while _watchLock is held.
+        if (noticeAfterLock is not null)
+            logOutput?.Invoke(noticeAfterLock);
+
+        if (logAfterLock is not null)
+            logOutput?.Invoke(logAfterLock);
     }
 
     private static void DisposeConfigWatcher()

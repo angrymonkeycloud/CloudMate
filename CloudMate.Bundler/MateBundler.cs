@@ -190,7 +190,16 @@ public class MateBundler
 
             case "less":
                 foreach (string file in files)
-                    pieces.Add(LessCompiler.Compile(file, build.Css.SourceMap));
+                {
+                    try
+                    {
+                        pieces.Add(LessCompiler.Compile(file, build.Css.SourceMap));
+                    }
+                    catch (Exception exception)
+                    {
+                        LogError($"{file}: {exception.Message}");
+                    }
+                }
 
                 break;
 

@@ -7,28 +7,28 @@ Console.Title = "CloudMate";
 
 // ─── Logging hooks ────────────────────────────────────────────────────────────
 
-MateBundler.Log         = msg => Print(msg, ConsoleColor.Cyan);
-MateBundler.LogError    = msg => Print(msg, ConsoleColor.Red);
-MateImageCompressor.Log      = msg => Print(msg, ConsoleColor.Cyan);
+MateBundler.Log = msg => Print(msg, ConsoleColor.Cyan);
+MateBundler.LogError = msg => Print(msg, ConsoleColor.Red);
+MateImageCompressor.Log = msg => Print(msg, ConsoleColor.Cyan);
 MateImageCompressor.LogError = msg => Print(msg, ConsoleColor.Red);
-MateWatcher.Log         = msg => Print(msg, ConsoleColor.DarkGray);
-MateWatcher.LogError    = msg => Print(msg, ConsoleColor.Red);
+MateWatcher.Log = msg => Print(msg, ConsoleColor.DarkGray);
+MateWatcher.LogError = msg => Print(msg, ConsoleColor.Red);
 
 // ─── Argument parsing (mirrors legacy minimist behavior) ─────────────────────
 
 List<string> positional = [];
-bool watchMode  = false;
-bool allBuilds  = false;
-bool showHelp   = false;
+bool watchMode = false;
+bool allBuilds = false;
+bool showHelp = false;
 bool showVersion = false;
 
 for (int i = 0; i < args.Length; i++)
 {
     switch (args[i])
     {
-        case "-w": case "--watch":   watchMode   = true; break;
-        case "-a": case "--all":     allBuilds   = true; break;
-        case "-h": case "--help":    showHelp    = true; break;
+        case "-w": case "--watch": watchMode = true; break;
+        case "-a": case "--all": allBuilds = true; break;
+        case "-h": case "--help": showHelp = true; break;
         case "-v": case "--version": showVersion = true; break;
         default:
             if (!args[i].StartsWith('-'))

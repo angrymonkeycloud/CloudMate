@@ -33,8 +33,24 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
         ThreadHelper.ThrowIfNotOnUIThread();
         if (sender is not OleMenuCommand cmd) return;
 
-        // Show only for folders – nothing else
-        cmd.Visible = GetSelectionKind() == SelectionKind.Folder;
+        // Show only for folders that are NOT yet configured — hide once added
+        if (GetSelectionKind() != SelectionKind.Folder)
+        {
+            cmd.Visible = false;
+            return;
+        }
+
+        try
+        {
+            string? path = GetSelectedPath();
+            string folderPath = (path ?? "").TrimEnd('\\', '/');
+            string? root = !string.IsNullOrEmpty(folderPath) ? ConfigWriter.FindProjectRoot(folderPath) : null;
+            cmd.Visible = root is null || !ConfigWriter.HasCompressFolder(root, folderPath);
+        }
+        catch
+        {
+            cmd.Visible = true;
+        }
     }
 
     private void Execute(object sender, EventArgs e)
@@ -48,7 +64,6 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
         }
 
         string? path = GetSelectedPath();
-        // Strip trailing separator so FindProjectRoot and filesystem ops work
         string folderPath = (path ?? "").TrimEnd('\\', '/');
 
         string? root = ConfigWriter.FindProjectRoot(folderPath);
@@ -58,16 +73,25 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
             return;
         }
 
-        ConfigWriter.Result r = ConfigWriter.AddCompressFolder(root, folderPath);
-        Log(r.Added
-            ? $"[compress] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
-            : $"[compress] {r.Message}");
+        _ = Task.Run(() =>
+        {
+            ConfigWriter.Result r = ConfigWriter.AddCompressFolder(root, folderPath);
+            CloudMatePackage.OutputLine(Package, r.Added
+                ? $"[compress] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
+                : $"[compress] {r.Message}");
 
-        // Always enforce Build Action = None / Do not copy on the config item.
-        EnsureConfigItemProperties(root);
+            if (r.Added)
+            {
+                ThreadHelper.JoinableTaskFactory.Run(async delegate
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    EnsureConfigItemProperties(root);
+                });
+            }
 
-        Log($"> mate  [{root}]");
-        RunBuild(root, new string[0]);
-        EnsureAlwaysWatching(root);
+            CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
+            RunBuild(root, Array.Empty<string>());
+            EnsureAlwaysWatching(root);
+        });
     }
 }

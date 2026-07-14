@@ -100,13 +100,57 @@ internal static class SassCompiler
 
             return result;
         };
+
+        // Dart's Uri.base calls self.location.href to get the CWD as a URI.
+        // Jint has no browser location object, so we provide one backed by the C# CWD.
+        if (typeof self.location === 'undefined' || self.location === null)
+            self.location = { href: __cm_cwd_uri() };
         """;
 
     private const string Bootstrap =
         """
-        var sass = globalThis._cliPkgExports.pop();
-        if (globalThis._cliPkgExports.length === 0) delete globalThis._cliPkgExports;
-        sass.load({ immutable: Immutable });
+        var __cm_exports = globalThis._cliPkgExports;
+        var sass;
+
+        if (typeof __cm_exports.load === 'function') {
+            // sass >= 1.85: _cliPkgExports has .load(requires, exportParam)
+            // Bridge Node's 'fs' module so the built-in FilesystemImporter works under Jint.
+            var __cm_fs = {
+                existsSync: function (p) {
+                    return __cm_fs_existsSync('' + p);
+                },
+                readFileSync: function (p, opts) {
+                    var enc = (opts && typeof opts === 'object') ? opts.encoding : opts;
+                    return __cm_fs_readFileSync('' + p, enc || 'utf8');
+                },
+                statSync: function (p) {
+                    var info = __cm_fs_statSync('' + p);
+                    if (info === null) throw new Error('ENOENT: ' + p);
+                    var parsed = JSON.parse(info);
+                    return {
+                        isFile: function () { return parsed.isFile; },
+                        isDirectory: function () { return parsed.isDirectory; },
+                        isSymbolicLink: function () { return false; },
+                        mtime: new Date(parsed.mtime),
+                        size: parsed.size
+                    };
+                },
+                readdirSync: function (p) {
+                    var r = __cm_fs_readdirSync('' + p);
+                    return r === null ? [] : JSON.parse(r);
+                },
+                realpathSync: { native: function (p) { return '' + p; } },
+                mkdirSync: function () {},
+                writeFileSync: function () {}
+            };
+            __cm_exports.load({ immutable: Immutable, fs: __cm_fs });
+            sass = __cm_exports;
+        } else {
+            // sass < 1.85: pop the real exports object and call load() on it
+            sass = __cm_exports.pop();
+            if (__cm_exports.length === 0) delete globalThis._cliPkgExports;
+            sass.load({ immutable: Immutable });
+        }
 
         var __cm_sass_importer = {
             canonicalize: function (url, context) {
@@ -145,7 +189,13 @@ internal static class SassCompiler
                     result.sourceMap = JSON.stringify(compiled.sourceMap);
             }
             catch (error) {
-                result.error = '' + error;
+                var msg = '' + error;
+                if (msg === 'null' || msg === '') {
+                    msg = (error && error.message) ? error.message
+                        : (error && error.stack) ? error.stack
+                        : JSON.stringify(error);
+                }
+                result.error = msg;
             }
 
             return JSON.stringify(result);
@@ -199,6 +249,11 @@ internal static class SassCompiler
 
         engine.SetValue("__cm_sass_canonicalize", Canonicalize);
         engine.SetValue("__cm_sass_load", Load);
+        engine.SetValue("__cm_fs_existsSync", FsExistsSync);
+        engine.SetValue("__cm_fs_readFileSync", FsReadFileSync);
+        engine.SetValue("__cm_fs_statSync", FsStatSync);
+        engine.SetValue("__cm_fs_readdirSync", FsReaddirSync);
+        engine.SetValue("__cm_cwd_uri", static () => new Uri(Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar).AbsoluteUri);
 
         engine.Execute(Polyfills);
         engine.Execute(CompilerAssets.GetPreparedScript(CompilerAssets.Immutable));
@@ -262,6 +317,37 @@ internal static class SassCompiler
         }
 
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static bool FsExistsSync(string path) => File.Exists(path) || Directory.Exists(path);
+
+    private static string FsReadFileSync(string path, string encoding) => File.ReadAllText(path);
+
+    private static string? FsStatSync(string path)
+    {
+        if (File.Exists(path))
+        {
+            FileInfo fi = new(path);
+            return JsonSerializer.Serialize(new { isFile = true, isDirectory = false, mtime = fi.LastWriteTimeUtc.ToString("o"), size = fi.Length });
+        }
+
+        if (Directory.Exists(path))
+            return JsonSerializer.Serialize(new { isFile = false, isDirectory = true, mtime = Directory.GetLastWriteTimeUtc(path).ToString("o"), size = 0L });
+
+        return null;
+    }
+
+    private static string? FsReaddirSync(string path)
+    {
+        if (!Directory.Exists(path))
+            return null;
+
+        string[] entries = Directory.GetFileSystemEntries(path)
+            .Select(Path.GetFileName)
+            .Where(n => n is not null)
+            .ToArray()!;
+
+        return JsonSerializer.Serialize(entries);
     }
 
     private static string? Load(string canonicalUrl)
