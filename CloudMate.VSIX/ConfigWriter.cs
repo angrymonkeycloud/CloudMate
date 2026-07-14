@@ -9,9 +9,10 @@ using System.Xml.Linq;
 namespace AngryMonkey.CloudMate.VisualStudio;
 
 /// <summary>
-/// Reads, mutates, and writes a CloudMate <c>mateconfig.json</c> file for the extension's
+/// Reads, mutates, and writes a CloudMate <c>mateconfig.json</c> config file for the extension's
 /// context-menu commands. Locates the owning project root (nearest <c>.csproj</c>), computes
 /// wwwroot-relative output paths, and appends <c>files</c>/<c>images</c> entries without duplicates.
+/// Creates <c>mateconfig.json</c> at the project root when it does not yet exist.
 /// </summary>
 internal static class ConfigWriter
 {

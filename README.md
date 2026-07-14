@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # CloudMate
 
@@ -9,7 +9,7 @@
 
 **A .NET 10 utility library for NuGet packaging automation, project code generation, compression, and C# code formatting.**
 
-[Getting Started](#getting-started) · [CloudPack](#cloudpack) · [CloudCode](#cloudcode) · [CloudCompression](#cloudcompression) · [CoreCSharp Formatter](#corecsharp-formatter)
+[Getting Started](#getting-started) · [CloudPack](#cloudpack) · [CloudCode](#cloudcode) · [CloudCompression](#cloudcompression) · [CoreCSharp Formatter](#corecsharp-formatter) · [Bundler](#cloudmate-bundler)
 
 </div>
 
@@ -416,17 +416,164 @@ No manual configuration is needed; these targets activate automatically for any 
 
 ---
 
+## CloudMate Bundler
+
+`CloudMate.Bundler` is the front-end asset pipeline library used by the `mate` CLI and the Visual Studio extension. It compiles, bundles, minifies, and watches TypeScript/JavaScript/CSS source files, and compresses images — all driven by a single `.mateconfig.json` file.
+
+### Supported Input Types
+
+| Extension | Processing |
+|---|---|
+| `.ts` | TypeScript → JavaScript (bundled TypeScript compiler) |
+| `.less` | LESS → CSS (bundled Less.js engine) |
+| `.scss` / `.sass` | Sass/SCSS → CSS (bundled Dart Sass engine) |
+| `.css` | CSS passthrough / concatenation |
+| `.js` | JavaScript passthrough / concatenation |
+| `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp` | Raster image compression (SkiaSharp) |
+| `.svg` | SVG passthrough |
+
+### Bundler Features
+
+- **Multi-file bundling** — multiple input files (or glob patterns) are resolved and concatenated into a single output
+- **Minification** — produces `.min.css` and `.min.js` side-by-side with every bundle; configurable per build profile
+- **Source maps** — optional source map generation for CSS and JavaScript outputs
+- **TypeScript declaration files** — generates and bundles `.d.ts` files alongside compiled JS output
+- **WebClean transform** — strips CommonJS `require()`/`exports` artifacts from TypeScript output for direct browser use without a module bundler
+- **Multiple named build profiles** — define `dev`, `dist`, or any custom profile, each with its own output directory, minification, and source-map settings
+- **Output directory versioning** — optionally append the package version (`OutDirVersioning`) or config name segment (`OutDirName`) to the output path
+- **Per-type directory suffixes** — separate sub-folder suffixes for CSS and JS within the same build (`OutDirSuffix`)
+- **Custom `tsconfig.json` path** — specify a TypeScript config file per build, or rely on auto-detection
+
+### Image Compression Features
+
+- **Lossless-style re-encoding** — re-encodes PNG, JPEG, GIF, and WebP images; keeps the original when the re-encoded result is larger
+- **Resize to max bounds** — constrain images to `MaxWidth` × `MaxHeight` while preserving the aspect ratio (never enlarges)
+- **Format conversion** — convert to any supported format (`png`, `jpg`, `jpeg`, `gif`, `webp`, `tiff`) via `OutputFormat`
+- **Batch glob processing** — image inputs support glob patterns for entire directories
+- **Incremental processing** — already-compressed outputs are skipped on subsequent runs
+
+### File Watcher
+
+- **Incremental rebuild on save** — re-runs only the affected bundle when a source file changes
+- **Implicit LESS/SCSS dependency tracking** — watches all `.less` and `.scss` files under the project root so `@import` changes trigger the correct rebuild
+- **Config hot-reload** — restarts automatically when `.mateconfig.json` or `.mateconfig.yaml` is modified
+- **Image watch** — re-compresses images on add, change, or delete
+
+### Configuration
+
+Configuration is stored in `mateconfig.json` (or `mateconfig.yaml` / `mateconfig.yml`) at the project root.
+
+**Supported config file names (searched in order):**
+`mateconfig.json`, `mateconfig.yaml`, `mateconfig.yml`, `.mateconfig`, `.mateconfig.json`, `.mateconfig.yaml`, `.mateconfig.yml`, `package.json` *(via `mateconfig` key)*
+
+**Example `mateconfig.json`:**
+
+```json
+{
+  "builds": [
+    {
+      "name": "dev",
+      "css": { "minify": true, "sourceMap": false },
+      "js":  { "minify": true, "sourceMap": true, "declaration": true, "webClean": false }
+    },
+    {
+      "name": "dist",
+      "outDir": "wwwroot/dist",
+      "outDirVersioning": true,
+      "css": { "minify": true },
+      "js":  { "minify": true, "webClean": true }
+    }
+  ],
+  "files": [
+    { "input": ["src/styles/**/*.less"], "output": ["wwwroot/css/site.css"], "builds": ["dev", "dist"] },
+    { "input": ["src/scripts/app.ts"],   "output": ["wwwroot/js/app.js"],    "builds": ["dev", "dist"] }
+  ],
+  "images": [
+    {
+      "input":  ["src/images/**/*"],
+      "output": ["wwwroot/images"],
+      "maxWidth": 1920,
+      "maxHeight": 1080,
+      "outputFormat": "webp"
+    }
+  ]
+}
+```
+
+#### `MateConfigBuild` Properties
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `Name` | `string` | `"dev"` | Build profile name |
+| `OutDir` | `string?` | *(from output path)* | Override output directory |
+| `OutDirVersioning` | `bool` | `false` | Append package version to output path |
+| `OutDirName` | `bool` | `false` | Append config name to output path |
+| `Ts` | `string?` | *(auto-detect)* | Path to `tsconfig.json` |
+| `Css.Minify` | `bool` | `true` | Generate `.min.css` |
+| `Css.SourceMap` | `bool` | `false` | Generate CSS source map |
+| `Css.OutDirSuffix` | `string?` | `null` | Sub-folder suffix for CSS output |
+| `Js.Minify` | `bool` | `true` | Generate `.min.js` |
+| `Js.SourceMap` | `bool` | `true` | Generate JS source map |
+| `Js.Declaration` | `bool` | `true` | Generate `.d.ts` declaration file |
+| `Js.WebClean` | `bool` | `false` | Apply WebClean transform to output |
+| `Js.OutDirSuffix` | `string?` | `null` | Sub-folder suffix for JS output |
+
+#### `MateConfigImage` Properties
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `Input` | `string[]` | *(required)* | Glob patterns for source images |
+| `Output` | `string[]` | *(required)* | Destination directories |
+| `MaxWidth` | `int?` | `null` | Maximum output width in pixels |
+| `MaxHeight` | `int?` | `null` | Maximum output height in pixels |
+| `OutputFormat` | `string?` | *(keep source format)* | Target format: `png`, `jpg`, `jpeg`, `gif`, `webp`, `tiff` |
+
+---
+
 ## Project Structure
 
 ```
 CloudMate/
-”œ”€”€ CloudMate.Server/          # Core library (AngryMonkey.CloudMate)
-”‚   ”œ”€”€ Code/                  # CloudCode €” .csproj generation
-”‚   ”œ”€”€ Compression/           # CloudCompression €” ZIP utilities
-”‚   ”œ”€”€ Formatter/             # CoreCSharp €” code formatting & AST builders
-”‚   ”œ”€”€ Packaging/             # CloudPack €” NuGet automation
-”‚   ”””€”€ buildTransitive/       # MSBuild targets (no runtime footprint)
-”””€”€ CloudMate.Package/         # CLI tool that publishes CloudMate itself
+├──
+ CloudMate.Server/          # Core library (AngryMonkey.CloudMate)
+│
+   
+├──
+ Code/                  # CloudCode 
+—
+ .csproj generation
+│
+   
+├──
+ Compression/           # CloudCompression 
+—
+ ZIP utilities
+│
+   
+├──
+ Formatter/             # CoreCSharp 
+—
+ code formatting & AST builders
+│
+   
+├──
+ Packaging/             # CloudPack 
+—
+ NuGet automation
+│
+   
+└──
+ buildTransitive/       # MSBuild targets (no runtime footprint)
+├──
+ CloudMate.Bundler/         # Bundler library 
+—
+ TypeScript/CSS/image pipeline
+├──
+ CloudMate.CLI/             # mate CLI tool
+├──
+ CloudMate.VSIX/            # Visual Studio extension
+└──
+ CloudMate.Package/         # CLI tool that publishes CloudMate itself
 ```
 
 ---

@@ -12,11 +12,13 @@ public class MateConfig
 {
     private static readonly string[] SearchPlaces =
     [
+        "mateconfig.json",
+        "mateconfig.yaml",
+        "mateconfig.yml",
         ".mateconfig",
         ".mateconfig.json",
         ".mateconfig.yaml",
         ".mateconfig.yml",
-        "mateconfig.json", // Deprecated
         "package.json"
     ];
 

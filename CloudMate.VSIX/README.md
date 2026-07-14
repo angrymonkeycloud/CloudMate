@@ -19,35 +19,196 @@ dotnet tool install -g AngryMonkey.CloudMate.CLI
 
 ## Features
 
-- Compile and bundle static assets (`.ts`, `.js`, `.css`, `.less`, `.scss`, `.sass`)
-- Configure folder-based image compression via `.mateconfig.json`
-- Rebuild from config and run always-on watch behavior from Visual Studio
-- Context menu integration in Solution Explorer
+### Bundler
 
-## Context Menu Behavior
+- **TypeScript compilation** — compiles `.ts` files using the bundled TypeScript compiler; supports `tsconfig.json` auto-detection or explicit path
+- **LESS compilation** — compiles `.less` files to CSS using the bundled Less.js engine
+- **Sass / SCSS compilation** — compiles `.sass` and `.scss` files to CSS using the bundled Dart Sass engine
+- **CSS passthrough & bundling** — concatenates plain `.css` files into a single output bundle
+- **JavaScript passthrough & bundling** — concatenates plain `.js` files into a single output bundle
+- **Minification** — produces `.min.css` and `.min.js` side-by-side with every bundle (configurable per build)
+- **Source maps** — optional source map generation for both CSS and JavaScript outputs
+- **TypeScript declaration files** — generates and bundles `.d.ts` declaration files alongside compiled JS output
+- **WebClean transform** — strips CommonJS `require()`/`exports` artifacts from TypeScript output for direct browser use
+- **Glob input patterns** — input lists support glob patterns; multiple inputs are resolved and concatenated in order
+- **Multiple builds** — define named build profiles (`dev`, `dist`, etc.) each with their own output directory, minification, and source-map settings
+- **Output directory versioning** — optionally append the package version or name segment to the output path (`OutDirVersioning`, `OutDirName`)
+- **Per-output-type directory suffixes** — separate sub-folder suffixes for CSS and JS outputs within the same build (`OutDirSuffix`)
 
-CloudMate commands are context-aware:
+### Image Compression
 
-- **Supported compile files** (`.ts`, `.js`, `.css`, `.less`, `.scss`, `.sass`)
-  - **Compile**
-  - **Recompile** + **Stop Compiling** when already configured
-- **Folders**
-  - **Compress** only
-- **`.mateconfig.json`**
-  - **Rebuild** only
-- **Unsupported files / images**
-  - No active CloudMate commands
+- **Raster image compression** — re-encodes PNG, JPEG, GIF, and WebP images using SkiaSharp; keeps the original when re-encoding would increase the file size
+- **SVG passthrough** — copies SVG files to the output directory without modification
+- **Resize to max bounds** — optionally constrain images to a maximum width and/or height while preserving the aspect ratio (never enlarges)
+- **Format conversion** — convert images to a different format (`png`, `jpg`, `jpeg`, `gif`, `webp`, `tiff`) via `OutputFormat`
+- **Glob input patterns** — image input supports glob patterns for batch processing entire directories
+- **Skip-if-exists** — already-compressed outputs are skipped on subsequent runs unless an override is requested
 
-## Updating Configuration
+### File Watcher
 
-CloudMate writes configuration to `.mateconfig.json` at the project root.
+- **Incremental rebuild on save** — watches all declared input files and re-runs only the affected bundle when a file changes
+- **Implicit dependency tracking** — always watches all `.less` and `.scss` files under the project root so `@import` changes trigger the right rebuild
+- **Config hot-reload** — detects changes to `.mateconfig.json` / `.mateconfig.yaml` and automatically restarts the watcher with the new configuration
+- **Image watch** — watches image input globs and re-compresses on add, change, or delete
 
-Typical flow:
-1. Right-click a supported file and choose **CloudMate > Compile**.
-2. Right-click a folder and choose **CloudMate > Compress**.
-3. Right-click `.mateconfig.json` and choose **CloudMate > Rebuild**.
+### Configuration
 
-To stop a file from compilation, right-click it and choose **CloudMate > Stop Compiling**.
+Configuration is stored in `mateconfig.json` (or `mateconfig.yaml` / `mateconfig.yml`) at the project root. CloudMate writes `mateconfig.json` automatically when a command is first used.
+
+**Supported config file names (searched in order):**
+`mateconfig.json`, `mateconfig.yaml`, `mateconfig.yml`, `.mateconfig`, `.mateconfig.json`, `.mateconfig.yaml`, `.mateconfig.yml`, `package.json` *(via `mateconfig` key)*
+
+**Example `mateconfig.json`:**
+
+```json
+{
+  "builds": [
+    {
+      "name": "dev",
+      "css": { "minify": true, "sourceMap": false },
+      "js":  { "minify": true, "sourceMap": true, "declaration": true, "webClean": false }
+    },
+    {
+      "name": "dist",
+      "outDir": "wwwroot/dist",
+      "outDirVersioning": true,
+      "css": { "minify": true },
+      "js":  { "minify": true, "webClean": true }
+    }
+  ],
+  "files": [
+    { "input": ["src/styles/**/*.less"], "output": ["wwwroot/css/site.css"], "builds": ["dev", "dist"] },
+    { "input": ["src/scripts/app.ts"],   "output": ["wwwroot/js/app.js"],    "builds": ["dev", "dist"] }
+  ],
+  "images": [
+    {
+      "input":  ["src/images/**/*"],
+      "output": ["wwwroot/images"],
+      "maxWidth": 1920,
+      "maxHeight": 1080,
+      "outputFormat": "webp"
+    }
+  ]
+}
+```
+
+## Context Menu Commands
+
+All CloudMate commands appear in **Solution Explorer** under the **CloudMate** submenu when you right-click an item. Which commands are visible depends entirely on the type of item selected and whether it is already registered in `mateconfig.json`.
+
+---
+
+### Compile file — `.ts` `.js` `.css` `.less` `.scss` `.sass`
+
+<!-- screenshot: right-click on a .ts or .less file showing the CloudMate > Compile item -->
+
+**Compile** is shown when the selected file is **not yet** registered in `mateconfig.json`.
+
+What it does:
+1. Creates `mateconfig.json` at the project root if it does not already exist.
+2. Appends a `files` entry mapping the selected file as input to its compiled output path.
+   - `.less` / `.scss` / `.sass` → output extension becomes `.css`
+   - `.ts` → output extension becomes `.js`
+   - `.js` / `.css` → extension is kept; file is passed through and bundled as-is
+3. When the project has a `wwwroot` folder and the file is inside `src/` or `source/`, the output is automatically placed under `wwwroot/` with the leading `src`/`source` segment stripped (e.g. `src/styles/site.less` → `wwwroot/styles/site.css`).
+4. Runs a one-time compile using the current configuration.
+5. Starts the always-on file watcher so subsequent saves recompile automatically.
+
+---
+
+### Recompile file — `.ts` `.js` `.css` `.less` `.scss` `.sass`
+
+<!-- screenshot: right-click on an already-configured file showing the CloudMate > Recompile item -->
+
+**Recompile** replaces **Compile** on the same menu item when the selected file **is already** registered in `mateconfig.json`.
+
+What it does:
+1. Makes no changes to `mateconfig.json`.
+2. Runs a one-time compile using the existing configuration.
+3. Ensures the always-on watcher is running.
+
+---
+
+### Stop Compiling — `.ts` `.js` `.css` `.less` `.scss` `.sass`
+
+<!-- screenshot: right-click on an already-configured file showing the CloudMate > Stop Compiling item -->
+
+**Stop Compiling** is shown alongside **Recompile** when the selected file **is already** registered in `mateconfig.json`.
+
+What it does:
+1. Removes all `files` entries in `mateconfig.json` whose `input` matches the selected file.
+2. Runs a one-time build so the remaining entries in the config are still up to date.
+3. Keeps the watcher running for any remaining configured files.
+
+---
+
+### Compress folder
+
+<!-- screenshot: right-click on a folder (e.g. src/images) showing the CloudMate > Compress item -->
+
+**Compress** is shown when a **folder** is selected and it is **not yet** registered in `mateconfig.json`.
+
+What it does:
+1. Creates `mateconfig.json` at the project root if it does not already exist.
+2. Appends an `images` entry with a recursive glob (`folder/**/*`) as input.
+   - When the project has a `wwwroot` folder and the folder is inside `src/` or `source/`, the output destination is automatically remapped to the corresponding path under `wwwroot/` (e.g. `src/images` → `wwwroot/images`).
+3. Runs a one-time image compression pass for all images found in the folder.
+4. Starts the always-on watcher so new or changed images in the folder are recompressed automatically.
+
+Supported image types: `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` (SVG is copied as-is).
+
+---
+
+### Stop Compressing folder
+
+<!-- screenshot: right-click on an already-configured folder showing the CloudMate > Stop Compressing item -->
+
+**Stop Compressing** replaces **Compress** for folders that **are already** registered in `mateconfig.json`.
+
+What it does:
+1. Removes all `images` entries in `mateconfig.json` whose `input` matches the selected folder glob.
+2. Runs a one-time build so any remaining config entries stay up to date.
+3. Keeps the watcher running for any remaining configured entries.
+
+---
+
+### Rebuild — `mateconfig.json` / `mateconfig.yaml` / `mateconfig.yml`
+
+<!-- screenshot: right-click on mateconfig.json showing the CloudMate > Rebuild item -->
+
+**Rebuild** is shown **only** when the `mateconfig.json` (or `mateconfig.yaml` / `mateconfig.yml`) file itself is selected.
+
+What it does:
+1. Makes no changes to `mateconfig.json`.
+2. Runs a full one-time build of **all** `files` and `images` entries in the configuration.
+3. Ensures the always-on watcher is running afterwards.
+
+Use this after manually editing the config to apply all changes at once.
+
+---
+
+### Unsupported items
+
+No CloudMate commands appear for:
+
+- **C# source files** (`.cs`, `.razor`, `.cshtml`, …)
+- **Project files** (`.csproj`, `.sln`)
+- **Image files** (`.png`, `.jpg`, `.svg`, …)
+- **Data / config files** (`.json` other than `mateconfig.json`, `.xml`, `.txt`, …)
+- **Any other file type** not in the supported compile list
+
+## Output Paths and the `src` / `source` Folder Convention
+
+When a `.NET` project contains a `wwwroot` folder, CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/`, stripping the leading `src` / `source` segment:
+
+| Source file | Output file |
+|---|---|
+| `src/styles/site.less` | `wwwroot/styles/site.css` |
+| `src/scripts/app.ts` | `wwwroot/scripts/app.js` |
+| `source/images/logo.png` | `wwwroot/images/logo.png` (compressed) |
+| `src/images/` *(folder)* | `wwwroot/images/` *(compressed)* |
+
+Files outside `src/` or `source/` are output next to the source file (no remapping). Projects without a `wwwroot` folder are also left as-is.
 
 ## Output
 
