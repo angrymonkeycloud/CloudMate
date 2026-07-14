@@ -103,6 +103,8 @@ All CloudMate commands appear in **Solution Explorer** under the **CloudMate** s
 
 **Compile** is shown when the selected file is **not yet** registered in `mateconfig.json`.
 
+![CloudMate Compile option in the file context menu](Resources/compiling/file-compile.png)
+
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
 2. Appends a `files` entry mapping the selected file as input to its compiled output path.
@@ -119,6 +121,8 @@ What it does:
 
 **Recompile** replaces **Compile** on the same menu item when the selected file **is already** registered in `mateconfig.json`.
 
+![CloudMate Recompile option in the file context menu](Resources/compiling/file-recompile.png)
+
 What it does:
 1. Makes no changes to `mateconfig.json`.
 2. Runs a one-time compile using the existing configuration.
@@ -130,6 +134,8 @@ What it does:
 
 **Stop Compiling** is shown alongside **Recompile** when the selected file **is already** registered in `mateconfig.json`.
 
+![CloudMate Stop Compiling option in the file context menu](Resources/compiling/file-stop-compiling.png)
+
 What it does:
 1. Removes all `files` entries in `mateconfig.json` whose `input` matches the selected file.
 2. Runs a one-time build so the remaining entries in the config are still up to date.
@@ -140,6 +146,8 @@ What it does:
 ### Compress — folder
 
 **Compress** is shown when a **folder** is selected and it is **not yet** registered in `mateconfig.json`.
+
+![CloudMate Compress option in the file context menu](Resources/compiling/folder-compile.png)
 
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
@@ -156,6 +164,8 @@ Supported image types: `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` (SVG is copied
 
 **Stop Compressing** replaces **Compress** for folders that **are already** registered in `mateconfig.json`.
 
+![CloudMate Stop Compressing option in the file context menu](Resources/compiling/folder-stop-compiling.png)
+
 What it does:
 1. Removes all `images` entries in `mateconfig.json` whose `input` matches the selected folder glob.
 2. Runs a one-time build so any remaining config entries stay up to date.
@@ -166,6 +176,8 @@ What it does:
 ### Rebuild — `mateconfig.json`
 
 **Rebuild** is shown **only** when the `mateconfig.json` file itself is selected.
+
+![CloudMate Rebuild option in the file context menu](Resources/compiling/mateconfig-rebuild.png)
 
 What it does:
 1. Makes no changes to `mateconfig.json`.
@@ -179,6 +191,8 @@ Use this after manually editing the config to apply all changes at once.
 ### Clean Config — `mateconfig.json`
 
 **Clean Config** is shown **only** when the `mateconfig.json` file itself is selected.
+
+![CloudMate Clean Config option in the file context menu](Resources/compiling/mateconfig-clear.png)
 
 What it does:
 1. Scans every `files` and `images` entry in `mateconfig.json`.
@@ -195,6 +209,8 @@ Use this after deleting source files to keep `mateconfig.json` in sync.
 ### Auto-Configure Files — `mateconfig.json`
 
 **Auto-Configure Files** is shown **only** when the `mateconfig.json` file itself is selected.
+
+![CloudMate Auto-Configure option in the file context menu](Resources/compiling/mateconfig-autoconfigure.png)
 
 What it does:
 1. **Cleans stale entries first** — scans every `files` and `images` entry and removes any whose source path no longer exists on disk (same logic as **Clean Config**). This ensures broken inputs are never left behind.
@@ -321,6 +337,8 @@ All CloudMate commands appear in **Solution Explorer** under the **CloudMate** s
 
 **Compile** is shown when the selected file is **not yet** registered in `mateconfig.json`.
 
+![CloudMate Compile option in the file context menu](Resources/compiling/file-compile.png)
+
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
 2. Appends a `files` entry mapping the selected file as input to its compiled output path.
@@ -339,6 +357,8 @@ What it does:
 
 **Recompile** replaces **Compile** on the same menu item when the selected file **is already** registered in `mateconfig.json`.
 
+![CloudMate Recompile option in the file context menu](Resources/compiling/file-recompile.png)
+
 What it does:
 1. Makes no changes to `mateconfig.json`.
 2. Runs a one-time compile using the existing configuration.
@@ -352,6 +372,8 @@ What it does:
 
 **Stop Compiling** is shown alongside **Recompile** when the selected file **is already** registered in `mateconfig.json`.
 
+![CloudMate Stop Compiling option in the file context menu](Resources/compiling/file-stop-compiling.png)
+
 What it does:
 1. Removes all `files` entries in `mateconfig.json` whose `input` matches the selected file.
 2. Runs a one-time build so the remaining entries in the config are still up to date.
@@ -364,6 +386,8 @@ What it does:
 <!-- screenshot: right-click on a folder (e.g. src/images) showing the CloudMate > Compress item -->
 
 **Compress** is shown when a **folder** is selected and it is **not yet** registered in `mateconfig.json`.
+
+![CloudMate Compress option in the file context menu](Resources/compiling/folder-compile.png)
 
 What it does:
 1. Creates `mateconfig.json` at the project root if it does not already exist.
@@ -382,6 +406,8 @@ Supported image types: `png`, `jpg`, `jpeg`, `gif`, `webp`, `svg` (SVG is copied
 
 **Stop Compressing** replaces **Compress** for folders that **are already** registered in `mateconfig.json`.
 
+![CloudMate Stop Compressing option in the file context menu](Resources/compiling/folder-stop-compiling.png)
+
 What it does:
 1. Removes all `images` entries in `mateconfig.json` whose `input` matches the selected folder glob.
 2. Runs a one-time build so any remaining config entries stay up to date.
@@ -394,6 +420,8 @@ What it does:
 <!-- screenshot: right-click on mateconfig.json showing the CloudMate > Rebuild item -->
 
 **Rebuild** is shown **only** when the `mateconfig.json` (or `mateconfig.yaml` / `mateconfig.yml`) file itself is selected.
+
+![CloudMate Rebuild option in the file context menu](Resources/compiling/mateconfig-rebuild.png)
 
 What it does:
 1. Makes no changes to `mateconfig.json`.
@@ -415,6 +443,8 @@ No CloudMate commands appear for:
 - **Any other file type** not in the supported compile list
 
 ## Output Paths and the `src` / `source` Folder Convention
+
+![CloudMate Output Paths option in the file context menu](Resources/compiling/wwwroot-src.png)
 
 CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/` whenever the project is a .NET project (contains a `.csproj`) **or** already has a `wwwroot` folder. The leading `src` / `source` segment is stripped:
 
