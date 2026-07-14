@@ -30,7 +30,7 @@ internal static class ConfigWriter
     internal sealed record CleanResult(int EntriesRemoved, int InputsRemoved, string ConfigPath);
 
     /// <summary>Result of an auto-configure operation.</summary>
-    internal sealed record AutoConfigureResult(int Added, int AlreadyConfigured, string ConfigPath);
+    internal sealed record AutoConfigureResult(int Added, int AlreadyConfigured, CleanResult Cleaned, string ConfigPath);
 
     /// <summary>
     /// Walks up from <paramref name="startPath"/> (a file or directory) to find the directory
@@ -580,9 +580,9 @@ internal static class ConfigWriter
     // ─── Auto-configure (add unconfigured source files) ─────────────────────────
 
     /// <summary>
-    /// Scans the project root for compilable source files (<c>.ts</c>, <c>.less</c>,
-    /// <c>.scss</c>, <c>.sass</c>) and adds any that are not yet present in
-    /// <c>mateconfig.json</c>. Directories that are never source roots
+    /// Cleans stale entries first, then scans the project root for compilable source files
+    /// (<c>.ts</c>, <c>.less</c>, <c>.scss</c>, <c>.sass</c>) and adds any that are not yet
+    /// present in <c>mateconfig.json</c>. Directories that are never source roots
     /// (<c>bin</c>, <c>obj</c>, <c>node_modules</c>, <c>.git</c>, <c>.vs</c>,
     /// <c>wwwroot</c>) are skipped.
     /// </summary>
@@ -590,6 +590,10 @@ internal static class ConfigWriter
     {
         string configPath = EnsureConfigExists(projectRoot);
 
+        // Phase 1: remove stale entries so we don't leave broken inputs behind.
+        CleanResult cleaned = CleanConfig(configPath, projectRoot);
+
+        // Phase 2: add unconfigured source files.
         int added = 0;
         int alreadyConfigured = 0;
 
@@ -606,7 +610,7 @@ internal static class ConfigWriter
                 added++;
         }
 
-        return new AutoConfigureResult(added, alreadyConfigured, configPath);
+        return new AutoConfigureResult(added, alreadyConfigured, cleaned, configPath);
     }
 
     private static readonly HashSet<string> AutoConfigureExtensions = new(StringComparer.OrdinalIgnoreCase)

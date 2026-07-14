@@ -13,6 +13,8 @@ MateImageCompressor.Log = msg => Print(msg, ConsoleColor.Cyan);
 MateImageCompressor.LogError = msg => Print(msg, ConsoleColor.Red);
 MateWatcher.Log = msg => Print(msg, ConsoleColor.DarkGray);
 MateWatcher.LogError = msg => Print(msg, ConsoleColor.Red);
+MateConfigManager.Log = msg => Print(msg, ConsoleColor.Cyan);
+MateConfigManager.LogError = msg => Print(msg, ConsoleColor.Red);
 
 // ─── Argument parsing (mirrors legacy minimist behavior) ─────────────────────
 
@@ -21,15 +23,19 @@ bool watchMode = false;
 bool allBuilds = false;
 bool showHelp = false;
 bool showVersion = false;
+bool cleanMode = false;
+bool autoConfigMode = false;
 
 for (int i = 0; i < args.Length; i++)
 {
     switch (args[i])
     {
-        case "-w": case "--watch": watchMode = true; break;
-        case "-a": case "--all": allBuilds = true; break;
-        case "-h": case "--help": showHelp = true; break;
-        case "-v": case "--version": showVersion = true; break;
+        case "-w": case "--watch":      watchMode = true;      break;
+        case "-a": case "--all":        allBuilds = true;      break;
+        case "-h": case "--help":       showHelp = true;       break;
+        case "-v": case "--version":    showVersion = true;    break;
+        case "-c": case "--clean":      cleanMode = true;      break;
+        case "--autoconfig":            autoConfigMode = true; break;
         default:
             if (!args[i].StartsWith('-'))
                 positional.Add(args[i]);
@@ -59,8 +65,55 @@ if (showHelp)
     Console.WriteLine("Options:");
     Console.WriteLine("  -a, --all          run all defined builds");
     Console.WriteLine("  -w, --watch        watch inputs and re-build on change");
+    Console.WriteLine("  -c, --clean        remove entries with missing input files from mateconfig.json");
+    Console.WriteLine("      --autoconfig   clean config and add all unconfigured .ts/.less/.scss/.sass files");
     Console.WriteLine("  -h, --help         print this help");
     Console.WriteLine("  -v, --version      print CloudMate version");
+    return 0;
+}
+
+// ─── --clean ─────────────────────────────────────────────────────────────────
+
+if (cleanMode)
+{
+    string projectRoot = Directory.GetCurrentDirectory();
+    MateConfigManager.CleanConfigResult clean = MateConfigManager.CleanConfig(projectRoot);
+
+    if (clean.EntriesRemoved == 0 && clean.InputsRemoved == 0)
+        MateConfigManager.Log("  Nothing to clean — all input paths exist.");
+    else
+    {
+        if (clean.EntriesRemoved > 0)
+            MateConfigManager.Log($"  Removed {clean.EntriesRemoved} entr{(clean.EntriesRemoved == 1 ? "y" : "ies")} with missing input files.");
+        if (clean.InputsRemoved > 0)
+            MateConfigManager.Log($"  Pruned {clean.InputsRemoved} missing input path{(clean.InputsRemoved == 1 ? "" : "s")} from array inputs.");
+    }
+
+    return 0;
+}
+
+// ─── --autoconfig ────────────────────────────────────────────────────────────
+
+if (autoConfigMode)
+{
+    string projectRoot = Directory.GetCurrentDirectory();
+    MateConfigManager.AutoConfigureResult result = MateConfigManager.AutoConfigure(projectRoot);
+
+    if (result.Cleaned.EntriesRemoved > 0)
+        MateConfigManager.Log($"  Removed {result.Cleaned.EntriesRemoved} stale entr{(result.Cleaned.EntriesRemoved == 1 ? "y" : "ies")} from mateconfig.json.");
+    if (result.Cleaned.InputsRemoved > 0)
+        MateConfigManager.Log($"  Pruned {result.Cleaned.InputsRemoved} missing input path{(result.Cleaned.InputsRemoved == 1 ? "" : "s")} from array inputs.");
+
+    if (result.Added > 0)
+        MateConfigManager.Log($"  Added {result.Added} file{(result.Added == 1 ? "" : "s")} to mateconfig.json.");
+    else if (result.AlreadyConfigured > 0)
+        MateConfigManager.Log("  Nothing new to configure.");
+    else
+        MateConfigManager.Log("  No compilable source files found in the project.");
+
+    if (result.AlreadyConfigured > 0)
+        MateConfigManager.Log($"  {result.AlreadyConfigured} file{(result.AlreadyConfigured == 1 ? " was" : "s were")} already configured.");
+
     return 0;
 }
 

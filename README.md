@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # CloudMate
 
@@ -527,6 +527,26 @@ Configuration is stored in `mateconfig.json` (or `mateconfig.yaml` / `mateconfig
 | `MaxWidth` | `int?` | `null` | Maximum output width in pixels |
 | `MaxHeight` | `int?` | `null` | Maximum output height in pixels |
 | `OutputFormat` | `string?` | *(keep source format)* | Target format: `png`, `jpg`, `jpeg`, `gif`, `webp`, `tiff` |
+
+
+### CLI Commands (`mate`)
+
+Run builds, watch for changes, or manage `mateconfig.json` from the terminal:
+
+```bash
+mate                  # run default (dev) build
+mate dist             # run dist build only
+mate dev dist         # run dev and dist builds
+mate -a, --all        # run all defined builds
+mate -w, --watch      # watch inputs and re-build on change
+mate -c, --clean      # remove entries with missing input files from mateconfig.json
+mate --autoconfig     # clean config then add all unconfigured .ts/.less/.scss/.sass files
+mate -v, --version    # print CloudMate version
+mate -h, --help       # print help
+```
+
+> **`--autoconfig`** always runs a clean pass first, so stale entries with deleted source files are
+> removed before new files are discovered and registered.
 
 ---
 

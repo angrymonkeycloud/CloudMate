@@ -197,12 +197,13 @@ Use this after deleting source files to keep `mateconfig.json` in sync.
 **Auto-Configure Files** is shown **only** when the `mateconfig.json` file itself is selected.
 
 What it does:
-1. Recursively scans the project root for compilable source files: `.ts`, `.less`, `.scss`, `.sass`.
-2. Skips directories that are not source roots: `bin`, `obj`, `node_modules`, `.git`, `.vs`, `wwwroot`.
-3. For each discovered file that is **not yet** registered in `mateconfig.json`, adds a `files` entry with the correct output path — following the same `src/` → `wwwroot/` mapping used by **Compile**.
-4. Logs how many files were added and how many were already configured.
+1. **Cleans stale entries first** — scans every `files` and `images` entry and removes any whose source path no longer exists on disk (same logic as **Clean Config**). This ensures broken inputs are never left behind.
+2. Recursively scans the project root for compilable source files: `.ts`, `.less`, `.scss`, `.sass`.
+3. Skips directories that are not source roots: `bin`, `obj`, `node_modules`, `.git`, `.vs`, `wwwroot`.
+4. For each discovered file that is **not yet** registered in `mateconfig.json`, adds a `files` entry with the correct output path — following the same `src/` → `wwwroot/` mapping used by **Compile**.
+5. Logs a summary of both phases: how many stale entries were removed and how many new files were added.
 
-Use this on an existing project to register all source files at once without adding them one by one.
+Use this on an existing project to clean and register all source files at once without adding them one by one.
 
 ---
 
