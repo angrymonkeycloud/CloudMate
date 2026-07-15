@@ -218,16 +218,19 @@ internal abstract class VsCommandBase
             return;
 
         AsyncPackage package = Package;
-        try
+        _ = Task.Run(() =>
         {
-            MateRunner.EnsureWatch(
-                workingDirectory,
-                line => CloudMatePackage.OutputLine(package, line),
-                line => CloudMatePackage.OutputLine(package, line));
-        }
-        catch (FileNotFoundException ex)
-        {
-            CloudMatePackage.OutputLine(package, $"[CloudMate] {ex.Message}");
-        }
+            try
+            {
+                MateRunner.EnsureWatch(
+                    workingDirectory,
+                    line => CloudMatePackage.OutputLine(package, line),
+                    line => CloudMatePackage.OutputLine(package, line));
+            }
+            catch (FileNotFoundException ex)
+            {
+                CloudMatePackage.OutputLine(package, $"[CloudMate] {ex.Message}");
+            }
+        });
     }
 }

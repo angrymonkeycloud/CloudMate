@@ -1,17 +1,18 @@
-﻿<div align="center">
-
 # CloudMate
-
-[![NuGet Version](https://img.shields.io/nuget/v/AngryMonkey.CloudMate?style=flat-square&logo=nuget&label=NuGet)](https://www.nuget.org/packages/AngryMonkey.CloudMate)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/AngryMonkey.CloudMate?style=flat-square&logo=nuget&label=Downloads)](https://www.nuget.org/packages/AngryMonkey.CloudMate)
+[![Website](https://img.shields.io/badge/Website-angrymonkeycloud.com-0B5FFF?style=flat-square&logo=googlechrome&logoColor=white)](https://angrymonkeycloud.com/cloudmate)
+[![GitHub repository](https://img.shields.io/badge/GitHub-CloudMate-181717?style=flat-square&logo=github)](https://github.com/angrymonkeycloud/CloudMate)
+[![NuGet](https://img.shields.io/nuget/v/AngryMonkey.CloudMate?style=flat-square&logo=nuget&label=NuGet)](https://www.nuget.org/packages/AngryMonkey.CloudMate)
+[![NuGet downloads](https://img.shields.io/nuget/dt/AngryMonkey.CloudMate?style=flat-square&logo=nuget&label=Downloads)](https://www.nuget.org/packages/AngryMonkey.CloudMate)
+[![Visual Studio extension](https://img.shields.io/visual-studio-marketplace/v/AngryMonkey.CloudMate?style=flat-square&logo=visualstudio&label=Visual%20Studio)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.CloudMate)
+[![Visual Studio downloads](https://img.shields.io/visual-studio-marketplace/d/AngryMonkey.CloudMate?style=flat-square&logo=visualstudio&label=Downloads)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.CloudMate)
+[![VS Code extension](https://img.shields.io/visual-studio-marketplace/v/AngryMonkey.cloudmate?style=flat-square&logo=visualstudiocode&label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.cloudmate)
+[![VS Code downloads](https://img.shields.io/visual-studio-marketplace/d/AngryMonkey.cloudmate?style=flat-square&logo=visualstudiocode&label=Downloads)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.cloudmate)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-2F855A?style=flat-square)](LICENSE)
 
 **A .NET 10 utility library for NuGet packaging automation, project code generation, compression, and C# code formatting.**
 
 [Getting Started](#getting-started) · [CloudPack](#cloudpack) · [CloudCode](#cloudcode) · [CloudCompression](#cloudcompression) · [CoreCSharp Formatter](#corecsharp-formatter) · [Bundler](#cloudmate-bundler)
-
-</div>
 
 ---
 
@@ -26,7 +27,15 @@ CloudMate is a compile-time .NET helper library (`AngryMonkey.CloudMate`) that p
 | **Compression** | `CloudCompression` | Creates in-memory ZIP archives from strings or byte arrays |
 | **Code Formatting** | `CoreCSharp` | Normalizes indentation and line spacing in generated C# code |
 
-> **Compile-time only** €” CloudMate ships with MSBuild targets that automatically remove it from consumer build and publish output, keeping your applications lean.
+### Packages
+
+| Package | Version | Downloads |
+| --- | --- | --- |
+| `AngryMonkey.CloudMate` | [![NuGet](https://img.shields.io/nuget/v/AngryMonkey.CloudMate?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate) | [![Downloads](https://img.shields.io/nuget/dt/AngryMonkey.CloudMate?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate) |
+| `AngryMonkey.CloudMate.Bundler` | [![NuGet](https://img.shields.io/nuget/v/AngryMonkey.CloudMate.Bundler?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate.Bundler) | [![Downloads](https://img.shields.io/nuget/dt/AngryMonkey.CloudMate.Bundler?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate.Bundler) |
+| `AngryMonkey.CloudMate.CLI` | [![NuGet](https://img.shields.io/nuget/v/AngryMonkey.CloudMate.CLI?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate.CLI) | [![Downloads](https://img.shields.io/nuget/dt/AngryMonkey.CloudMate.CLI?style=flat-square&logo=nuget)](https://www.nuget.org/packages/AngryMonkey.CloudMate.CLI) |
+
+> **Compile-time only** — CloudMate ships with MSBuild targets that automatically remove it from consumer build and publish output, keeping your applications lean.
 
 ---
 
@@ -54,18 +63,18 @@ using AngryMonkey.CloudMate;
 
 ## CloudPack
 
-`CloudPack` automates the full NuGet release pipeline: syncing version and metadata across projects, rebuilding in Release mode, packing to `.nupkg`, and publishing to nuget.org €” with retry logic and a styled console UI.
+`CloudPack` automates the full NuGet release pipeline: syncing version and metadata across projects, rebuilding in Release mode, packing to `.nupkg`, and publishing to nuget.org — with retry logic and a styled console UI.
 
 ### Pipeline Phases
 
 ```
-[Update Metadata] †’ [Rebuild] †’ [Pack] †’ [Publish]
+[Update Metadata] -> [Rebuild] -> [Pack] -> [Publish]
 ```
 
-1. **Update Metadata** €” reads version, authors, company, icon, and other properties from a source project and propagates them to all target projects.
-2. **Rebuild** €” runs `dotnet clean` then `dotnet build -c Release` on each project.
-3. **Pack** €” runs `dotnet pack -c Release -o ./nupkgs` and outputs `.nupkg` files.
-4. **Publish** €” runs `dotnet nuget push` to nuget.org, detecting duplicates and retrying on transient network errors.
+1. **Update Metadata** — reads version, authors, company, icon, and other properties from a source project and propagates them to all target projects.
+2. **Rebuild** — runs `dotnet clean` then `dotnet build -c Release` on each project.
+3. **Pack** — runs `dotnet pack -c Release -o ./nupkgs` and outputs `.nupkg` files.
+4. **Publish** — runs `dotnet nuget push` to nuget.org, detecting duplicates and retrying on transient network errors.
 
 ### Basic Usage
 
@@ -277,7 +286,7 @@ new CloudCode.ProjectLocalReference
 
 ## CloudCompression
 
-`CloudCompression` creates in-memory ZIP archives from a collection of files, returning the raw bytes and MIME type €” ideal for download endpoints or file-generation pipelines.
+`CloudCompression` creates in-memory ZIP archives from a collection of files, returning the raw bytes and MIME type — ideal for download endpoints or file-generation pipelines.
 
 ### Creating a ZIP Archive
 
@@ -289,8 +298,8 @@ CloudCompression.Result result = CloudCompression.Zip(
     new CloudCompression.File("image.png", imageBytes)
 ]);
 
-// result.Content      †’ byte[]
-// result.ContentType  †’ "application/zip"
+// result.Content      -> byte[]
+// result.ContentType  -> "application/zip"
 ```
 
 ### Using the Result in ASP.NET Core
@@ -342,8 +351,8 @@ string formatted = CoreCSharp.Format(rawCode);
 
 `Format()` applies two passes:
 
-1. **Line spacing** €” inserts blank lines before `namespace`, `if`, `for`, `foreach`, `try`, `return`, `switch`, `case`, and `default` keywords.
-2. **Indentation** €” normalises tab-based indentation according to `{` / `}` depth.
+1. **Line spacing** — inserts blank lines before `namespace`, `if`, `for`, `foreach`, `try`, `return`, `switch`, `case`, and `default` keywords.
+2. **Indentation** — normalises tab-based indentation according to `{` / `}` depth.
 
 ### Building Switch Statements
 
@@ -409,8 +418,8 @@ CloudMate includes MSBuild targets ensuring the library is **never copied to con
 
 The targets (shipped in `buildTransitive/`) perform two automatic removals:
 
-- **After `ResolveReferences`** €” removes `AngryMonkey.CloudMate` from local copy paths.
-- **Before `ComputeFilesToPublish`** €” removes it from publish output.
+- **After `ResolveReferences`** — removes `AngryMonkey.CloudMate` from local copy paths.
+- **Before `ComputeFilesToPublish`** — removes it from publish output.
 
 No manual configuration is needed; these targets activate automatically for any project that references the package.
 
@@ -620,6 +629,11 @@ Contributions, issues, and feature requests are welcome. Please open an issue or
 
 <div align="center">
 
-Made with ¤ï¸ by [Angry Monkey](https://github.com/angrymonkeycloud)
 
 </div>
+
+---
+
+## Angry Monkey Cloud
+
+This project is part of the [Angry Monkey Cloud](https://angrymonkeycloud.com) open-source ecosystem. Follow the shared [AI development instructions](https://github.com/angrymonkeycloud/CloudDocs/blob/main/docs/ai/instructions.md) and browse the [project catalog](https://angrymonkeycloud.com) and [GitHub organization](https://github.com/angrymonkeycloud).

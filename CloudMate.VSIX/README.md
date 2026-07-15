@@ -1,9 +1,12 @@
 # CloudMate for Visual Studio
+[![Website](https://img.shields.io/badge/Website-angrymonkeycloud.com-0B5FFF?style=flat-square&logo=googlechrome&logoColor=white)](https://angrymonkeycloud.com/cloudmate)
+[![GitHub repository](https://img.shields.io/badge/GitHub-CloudMate-181717?style=flat-square&logo=github)](https://github.com/angrymonkeycloud/CloudMate)
+[![Visual Studio extension](https://img.shields.io/visual-studio-marketplace/v/AngryMonkey.CloudMate?style=flat-square&logo=visualstudio&label=Visual%20Studio)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.CloudMate)
+[![Visual Studio downloads](https://img.shields.io/visual-studio-marketplace/d/AngryMonkey.CloudMate?style=flat-square&logo=visualstudio&label=Downloads)](https://marketplace.visualstudio.com/items?itemName=AngryMonkey.CloudMate)
+[![License](https://img.shields.io/badge/License-MIT-2F855A?style=flat-square)](../LICENSE)
+
 
 CloudMate integrates the `mate` CLI into Visual Studio for .NET solutions that include front-end/static assets.
-
-- Website: https://angrymonkeycloud.com/cloudmate
-- GitHub: https://github.com/angrymonkeycloud/CloudMate
 
 ## Best Use
 
@@ -251,3 +254,9 @@ Files outside `src/` or `source/` are output next to the source file (no remappi
 ## Output
 
 All CloudMate output is written to the **CloudMate** pane in the Visual Studio Output window.
+
+---
+
+## Angry Monkey Cloud
+
+This project is part of the [Angry Monkey Cloud](https://angrymonkeycloud.com) open-source ecosystem. Follow the shared [AI development instructions](https://github.com/angrymonkeycloud/CloudDocs/blob/main/docs/ai/instructions.md) and browse the [project catalog](https://angrymonkeycloud.com) and [GitHub organization](https://github.com/angrymonkeycloud).

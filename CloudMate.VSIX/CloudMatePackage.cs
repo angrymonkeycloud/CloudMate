@@ -53,11 +53,11 @@ public sealed class CloudMatePackage : AsyncPackage
     /// <summary>
     /// Writes a line to the "CloudMate" output pane, creating it on first use.
     /// Safe to call from any thread: pane creation and activation are marshaled to the UI
-    /// thread and the text is written with the thread-safe output API.
+    /// thread via fire-and-forget so the calling thread is never blocked.
     /// </summary>
     internal static void OutputLine(IServiceProvider package, string message)
     {
-        ThreadHelper.JoinableTaskFactory.Run(async () =>
+        _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
@@ -92,23 +92,40 @@ public sealed class CloudMatePackage : AsyncPackage
                 return;
 
             string solutionDir = Path.GetDirectoryName(solutionPath) ?? string.Empty;
-            if (string.IsNullOrEmpty(solutionDir) || !Directory.Exists(solutionDir))
+            if (string.IsNullOrEmpty(solutionDir))
                 return;
 
-            string[] configFiles = Directory.GetFiles(solutionDir, ConfigWriter.ConfigFileName, SearchOption.AllDirectories);
-            if (configFiles.Length == 0)
-                return;
+            // Capture 'this' reference for use in background task
+            AsyncPackage package = this;
 
-            string watchDir = Path.GetDirectoryName(configFiles[0]) ?? string.Empty;
-            if (string.IsNullOrEmpty(watchDir))
-                return;
+            // Offload all IO and process startup to a background thread so the UI thread is never blocked.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    if (!Directory.Exists(solutionDir))
+                        return;
 
-            MateRunner.EnsureWatch(
-                watchDir,
-                line => OutputLine(this, line),
-                line => OutputLine(this, line));
+                    string[] configFiles = Directory.GetFiles(solutionDir, ConfigWriter.ConfigFileName, SearchOption.AllDirectories);
+                    if (configFiles.Length == 0)
+                        return;
 
-            OutputLine(this, $"[CloudMate] always-on watch enabled in '{watchDir}'.");
+                    string watchDir = Path.GetDirectoryName(configFiles[0]) ?? string.Empty;
+                    if (string.IsNullOrEmpty(watchDir))
+                        return;
+
+                    MateRunner.EnsureWatch(
+                        watchDir,
+                        line => OutputLine(package, line),
+                        line => OutputLine(package, line));
+
+                    OutputLine(package, $"[CloudMate] always-on watch enabled in '{watchDir}'.");
+                }
+                catch (Exception ex)
+                {
+                    OutputLine(package, $"[CloudMate] watch bootstrap skipped: {ex.Message}");
+                }
+            });
         }
         catch (Exception ex)
         {
