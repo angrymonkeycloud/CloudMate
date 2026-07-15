@@ -37,6 +37,7 @@ public sealed class CloudMatePackage : AsyncPackage
         await Commands.CompileVsCommand.InitializeAsync(this);
         await Commands.StopCompilingVsCommand.InitializeAsync(this);
         await Commands.CompressFolderVsCommand.InitializeAsync(this);
+        await Commands.RecompressFolderVsCommand.InitializeAsync(this);
         await Commands.StopCompressingVsCommand.InitializeAsync(this);
         await Commands.BuildVsCommand.InitializeAsync(this);
         await Commands.CleanConfigVsCommand.InitializeAsync(this);

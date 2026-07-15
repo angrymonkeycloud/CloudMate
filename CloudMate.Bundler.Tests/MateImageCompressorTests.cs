@@ -141,6 +141,32 @@ public class MateImageCompressorTests
     }
 
     [Fact]
+    public void Execute_NestedSourceFolder_PreservesSubfolderStructureInOutput()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        Directory.CreateDirectory(dir.Combine(Path.Combine("src", "img", "logos")));
+        WritePng(dir.Combine(Path.Combine("src", "img", "photo.png")), 40, 40, SKColors.Red);
+        WritePng(dir.Combine(Path.Combine("src", "img", "logos", "logo.png")), 40, 40, SKColors.Green);
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.Images =
+        [
+            new MateConfigImage
+            {
+                Input = ["src/img/**/*"],
+                Output = ["wwwroot/img"]
+            }
+        ];
+
+        MateImageCompressor.Execute(config);
+
+        Assert.True(File.Exists(dir.Combine(Path.Combine("wwwroot", "img", "photo.png"))));
+        Assert.True(File.Exists(dir.Combine(Path.Combine("wwwroot", "img", "logos", "logo.png"))));
+        Assert.False(Directory.Exists(dir.Combine(Path.Combine("wwwroot", "imggos"))));
+    }
+
+    [Fact]
     public void Delete_RemovesCorrespondingOutputFile()
     {
         using TempDirectory dir = new();

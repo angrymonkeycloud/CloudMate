@@ -102,6 +102,19 @@ export class MateConfig {
 		config.images = configJson.images;
 		config.builds = configJson.builds ?? [];
 
+		// Normalize file entries: input/output/builds may be a single string in the JSON
+		// (the single-or-array shorthand). Without this, .forEach on a string crashes at runtime.
+		if (config.files) {
+			config.files.forEach((file) => {
+				if (typeof (file.input as any) === 'string') file.input = [file.input as any];
+				if (typeof (file.output as any) === 'string') file.output = [file.output as any];
+				if (!file.output) file.output = [];
+				if (!file.input) file.input = [];
+				if (typeof (file.builds as any) === 'string') file.builds = [file.builds as any];
+				if (!file.builds) file.builds = ['dev'];
+			});
+		}
+
 		// TS Config
 
 		const tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");

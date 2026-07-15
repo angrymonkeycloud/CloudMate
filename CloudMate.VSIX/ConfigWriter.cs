@@ -230,7 +230,7 @@ internal static class ConfigWriter
     private static readonly string[] SourceFolderNames = ["src", "source"];
 
     /// <summary>Converts an absolute path to a forward-slashed path relative to <paramref name="projectRoot"/>.</summary>
-    private static string ToRelative(string projectRoot, string absolutePath)
+    internal static string ToRelative(string projectRoot, string absolutePath)
     {
         // Path.GetRelativePath is not available on .NET Framework 4.7.2; use Uri instead.
         Uri rootUri = new Uri(projectRoot.TrimEnd('\\', '/') + '/');

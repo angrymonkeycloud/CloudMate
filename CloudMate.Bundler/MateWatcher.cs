@@ -152,19 +152,28 @@ public sealed class MateWatcher : IDisposable
                 if (!Directory.Exists(watchDir))
                     watchDir = _config.RootDirectory;
 
-                string filter = GlobResolver.IsGlob(input) ? Path.GetFileName(input) : "*";
+                string filter = "*";
+                // Use a recursive watcher when the pattern covers subdirectories (**)
+                // so that images added or changed in nested folders are also processed.
+                bool imageRecursive = input.Contains("**");
 
                 AddWatcher(watchDir, filter, (_, e) =>
                 {
+                    // Only react to actual image files; without this, saving any other file
+                    // (e.g. .less) inside the watched tree triggered a full recompression,
+                    // flooding the FileSystemWatcher buffer and dropping compile events.
+                    if (IsExcludedPath(e.FullPath) || !MateImageCompressor.IsSupportedImagePath(e.FullPath))
+                        return;
+
                     MateImageCompressor.QueueImages(_config, captured, @override: true);
                     MateImageCompressor.CompressImages();
-                });
+                }, recursive: imageRecursive);
 
                 AddWatcher(watchDir, filter, (_, e) =>
                 {
-                    if (e.FullPath is { } fp)
+                    if (e.FullPath is { } fp && !IsExcludedPath(fp) && MateImageCompressor.IsSupportedImagePath(fp))
                         MateImageCompressor.Delete(_config, captured, fp);
-                }, watcherType: WatcherChangeTypes.Deleted);
+                }, recursive: imageRecursive, watcherType: WatcherChangeTypes.Deleted);
             }
         }
     }
@@ -268,8 +277,14 @@ public sealed class MateWatcher : IDisposable
             Filter = filter,
             IncludeSubdirectories = recursive,
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
+            // Default 8 KB buffer overflows easily in projects with many files (image
+            // compression bursts), silently dropping events. 64 KB is the OS maximum.
+            InternalBufferSize = 64 * 1024,
             EnableRaisingEvents = true
         };
+
+        // On buffer overflow events are lost; log it so the user knows a manual rebuild may be needed.
+        watcher.Error += (_, e) => LogError($"Watcher overflow in '{directory}': {e.GetException().Message} — some changes may have been missed.");
 
         if ((watcherType & WatcherChangeTypes.Changed) != 0)
             watcher.Changed += handler;

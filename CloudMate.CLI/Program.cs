@@ -25,6 +25,7 @@ bool showHelp = false;
 bool showVersion = false;
 bool cleanMode = false;
 bool autoConfigMode = false;
+bool recompressMode = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -36,6 +37,7 @@ for (int i = 0; i < args.Length; i++)
         case "-v": case "--version":    showVersion = true;    break;
         case "-c": case "--clean":      cleanMode = true;      break;
         case "--autoconfig":            autoConfigMode = true; break;
+        case "--recompress":            recompressMode = true; break;
         default:
             if (!args[i].StartsWith('-'))
                 positional.Add(args[i]);
@@ -67,6 +69,7 @@ if (showHelp)
     Console.WriteLine("  -w, --watch        watch inputs and re-build on change");
     Console.WriteLine("  -c, --clean        remove entries with missing input files from mateconfig.json");
     Console.WriteLine("      --autoconfig   clean config and add all unconfigured .ts/.less/.scss/.sass files");
+    Console.WriteLine("      --recompress   force re-compress all images even if output files already exist");
     Console.WriteLine("  -h, --help         print this help");
     Console.WriteLine("  -v, --version      print CloudMate version");
     return 0;
@@ -139,7 +142,7 @@ IReadOnlyList<string>? builds = allBuilds ? null : (positional.Count > 0 ? posit
 if (watchMode)
 {
     MateBundler.Execute(config, builds);
-    MateImageCompressor.Execute(config);
+    MateImageCompressor.Execute(config, recompress: recompressMode);
 
     using MateWatcher watcher = new(config, builds);
     watcher.WaitForExit();
@@ -147,7 +150,7 @@ if (watchMode)
 else
 {
     MateBundler.Execute(config, builds);
-    MateImageCompressor.Execute(config);
+    MateImageCompressor.Execute(config, recompress: recompressMode);
 }
 
 return 0;

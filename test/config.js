@@ -122,6 +122,18 @@ var MateConfig = (function () {
         config.files = configJson.files;
         config.images = configJson.images;
         config.builds = (_a = configJson.builds) !== null && _a !== void 0 ? _a : [];
+        // Normalize file entries: input/output/builds may be a single string in the JSON.
+        // Without this, .forEach on a string crashes at runtime.
+        if (config.files) {
+            config.files.forEach(function (file) {
+                if (typeof file.input === 'string') file.input = [file.input];
+                if (typeof file.output === 'string') file.output = [file.output];
+                if (!file.output) file.output = [];
+                if (!file.input) file.input = [];
+                if (typeof file.builds === 'string') file.builds = [file.builds];
+                if (!file.builds) file.builds = ['dev'];
+            });
+        }
         var tsConfigPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
         if (tsConfigPath)
             config.builds.forEach(function (build) {

@@ -101,6 +101,17 @@
 				</Strings>
 			</Button>
 
+			<Button guid="guidCloudMateCmdSet" id="cmdidRecompressImages" priority="0x0210" type="Button">
+				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
+				<Icon guid="guidIconCompress" id="1"/>
+				<CommandFlag>DynamicVisibility</CommandFlag>
+				<CommandFlag>DefaultInvisible</CommandFlag>
+				<Strings>
+					<ButtonText>Recompress</ButtonText>
+					<ToolTipText>Force re-compress all images in this folder, overwriting existing outputs</ToolTipText>
+				</Strings>
+			</Button>
+
 			<Button guid="guidCloudMateCmdSet" id="cmdidStopCompressing" priority="0x0250" type="Button">
 				<Parent guid="guidCloudMateCmdSet" id="guidCloudMateSubMenuGroup"/>
 				<Icon guid="guidIconUncompress" id="1"/>
@@ -173,6 +184,7 @@
 			<IDSymbol name="cmdidCompile"              value="0x0101"/>
 			<IDSymbol name="cmdidStopCompiling"        value="0x0106"/>
 			<IDSymbol name="cmdidCompressImages"       value="0x0102"/>
+			<IDSymbol name="cmdidRecompressImages"    value="0x0108"/>
 			<IDSymbol name="cmdidStopCompressing"       value="0x0107"/>
 			<IDSymbol name="cmdidBuild"                value="0x0103"/>
 			<IDSymbol name="cmdidCleanConfig"          value="0x0104"/>

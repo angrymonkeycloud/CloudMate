@@ -15,6 +15,13 @@ public static class MateImageCompressor
 
     private static readonly string[] SupportedRasterExtensions = ["png", "jpeg", "jpg", "gif", "webp"];
 
+    /// <summary>True when the path has an extension the compressor can process (raster formats or svg).</summary>
+    public static bool IsSupportedImagePath(string path)
+    {
+        string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        return extension == "svg" || SupportedRasterExtensions.Contains(extension);
+    }
+
     private sealed class ImageQueueItem
     {
         public required string FilePath { get; init; }
@@ -29,13 +36,14 @@ public static class MateImageCompressor
     private static bool _compressionInProgress;
 
     /// <summary>Processes all image entries in the configuration. Mirrors legacy MateCompressor.execute.</summary>
-    public static void Execute(MateConfig config)
+    /// <param name="recompress">When <see langword="true"/>, re-compresses images even if the output already exists.</param>
+    public static void Execute(MateConfig config, bool recompress = false)
     {
         if (config.Images is null)
             return;
 
         foreach (MateConfigImage image in config.Images)
-            QueueImages(config, image);
+            QueueImages(config, image, @override: recompress);
 
         CompressImages();
     }
@@ -236,11 +244,17 @@ public static class MateImageCompressor
     private static string ResolveDestination(MateConfig config, string output, string baseDirectory, string file)
     {
         string destination = Path.GetFullPath(Path.Combine(config.RootDirectory, output.Replace('/', Path.DirectorySeparatorChar)));
-        string fileDirectory = Path.GetDirectoryName(file)!;
+        string fileDirectory = Path.GetFullPath(Path.GetDirectoryName(file)!);
+        string normalizedBase = Path.GetFullPath(baseDirectory);
 
-        if (fileDirectory.Length > baseDirectory.Length
-            && fileDirectory.StartsWith(baseDirectory, StringComparison.OrdinalIgnoreCase))
-            destination += fileDirectory[baseDirectory.Length..];
+        // Compute the sub-path with Path.GetRelativePath instead of string slicing:
+        // this is immune to trailing separators, casing, and normalization differences
+        // that previously produced merged folder names (e.g. "wwwroot\imggos").
+        string relative = Path.GetRelativePath(normalizedBase, fileDirectory);
+
+        // "." = file sits directly in the base directory; ".."/rooted = not under the base at all.
+        if (relative != "." && !relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+            destination = Path.Combine(destination, relative);
 
         return destination;
     }
