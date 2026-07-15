@@ -75,34 +75,14 @@ internal sealed class CompileVsCommand : VsCommandBase
 
         _ = Task.Run(() =>
         {
-            bool added = false;
+            ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path);
+            CloudMatePackage.OutputLine(Package, r.Added
+                ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
+                : $"[recompile] {r.Message} Running one-time rebuild.");
 
-            if (!ConfigWriter.HasCompileFile(root, path))
-            {
-                ConfigWriter.Result r = ConfigWriter.AddCompileFile(root, path);
-                CloudMatePackage.OutputLine(Package, r.Added
-                    ? $"[compile] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
-                    : $"[compile] {r.Message}");
-
-                added = r.Added;
-            }
-            else
-            {
-                CloudMatePackage.OutputLine(Package, $"[recompile] {Path.GetFileName(path)} already configured – running one-time rebuild.");
-            }
-
-            // Set project-item metadata on UI thread only when a new config entry was added.
-            if (added)
-            {
-                ThreadHelper.JoinableTaskFactory.Run(async delegate
-                {
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                    EnsureConfigItemProperties(root);
-                });
-            }
-
-            CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
-            RunBuild(root, Array.Empty<string>());
+            string relativeInput = ConfigWriter.ToRelative(root, path);
+            CloudMatePackage.OutputLine(Package, $"> mate --input {relativeInput}  [{root}]");
+            RunBuild(root, ["--input", relativeInput]);
             EnsureAlwaysWatching(root);
         });
     }

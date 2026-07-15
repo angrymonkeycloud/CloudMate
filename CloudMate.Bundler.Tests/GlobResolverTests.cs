@@ -3,6 +3,18 @@ namespace AngryMonkey.CloudMate.Tests;
 public class GlobResolverTests
 {
     [Fact]
+    public void IsMatch_MatchesOnlyTheConfiguredInputPattern()
+    {
+        using TempDirectory dir = new();
+        string configured = dir.WriteFile(Path.Combine("src", "app.js"), "console.log(1);");
+        string unrelated = dir.WriteFile(Path.Combine("src", "other.js"), "console.log(2);");
+
+        Assert.True(GlobResolver.IsMatch("src/app.js", dir.Path, configured));
+        Assert.False(GlobResolver.IsMatch("src/app.js", dir.Path, unrelated));
+        Assert.True(GlobResolver.IsMatch("src/**/*.js", dir.Path, unrelated));
+    }
+
+    [Fact]
     public void Resolve_LiteralPath_ReturnsFullPathWhenFileExists()
     {
         using TempDirectory dir = new();

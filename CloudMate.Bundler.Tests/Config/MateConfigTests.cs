@@ -3,6 +3,40 @@ namespace AngryMonkey.CloudMate.Tests;
 public class MateConfigTests
 {
     [Fact]
+    public void Get_LoadsPerFileMinifyOverride()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", """
+            {
+              "files": [
+                { "input": "Component.razor.less", "output": "Component.razor.css", "minify": false }
+              ]
+            }
+            """);
+
+        MateConfig config = MateConfig.Get(dir.Path);
+
+        Assert.False(config.Files.Single().Minify);
+    }
+
+    [Fact]
+    public void AutoConfigure_DisablesMinificationOnlyForRazorComponentStyles()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile("Component.razor", "<div />");
+        dir.WriteFile("Component.razor.less", ".component { color: red; }");
+        dir.WriteFile("site.less", ".site { color: blue; }");
+
+        MateConfigManager.AutoConfigure(dir.Path);
+        MateConfig config = MateConfig.Get(dir.Path);
+
+        MateConfigFile component = Assert.Single(config.Files, file => file.Input.Contains("Component.razor.less"));
+        MateConfigFile site = Assert.Single(config.Files, file => file.Input.Contains("site.less"));
+        Assert.False(component.Minify);
+        Assert.Null(site.Minify);
+    }
+
+    [Fact]
     public void FindConfigurationFile_FindsMateConfigJsonInWorkingDirectory()
     {
         using TempDirectory dir = new();
@@ -32,6 +66,18 @@ public class MateConfigTests
         using TempDirectory dir = new();
         string preferred = dir.WriteFile(".mateconfig", "{}");
         dir.WriteFile(".mateconfig.json", "{}");
+
+        string found = MateConfig.FindConfigurationFile(dir.Path);
+
+        Assert.Equal(preferred, found);
+    }
+
+    [Fact]
+    public void FindConfigurationFile_PrefersCanonicalDotConfigOverDeprecatedUnprefixedConfig()
+    {
+        using TempDirectory dir = new();
+        string preferred = dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
 
         string found = MateConfig.FindConfigurationFile(dir.Path);
 

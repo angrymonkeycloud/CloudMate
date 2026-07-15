@@ -39,9 +39,6 @@ internal abstract class VsCommandBase
 
     // --- Selection via DTE ---------------------------------------------------
 
-    /// <summary>The CloudMate configuration file name.</summary>
-    protected const string ConfigFileName = ConfigWriter.ConfigFileName;
-
     /// <summary>
     /// Static web-asset extensions CloudMate can compile / bundle.
     /// ONLY these file types show the Compile / Recompile / Stop Compiling commands.
@@ -114,7 +111,7 @@ internal abstract class VsCommandBase
         if (!File.Exists(path))
             return SelectionKind.None;
 
-        if (string.Equals(Path.GetFileName(path), ConfigFileName, StringComparison.OrdinalIgnoreCase))
+        if (ConfigWriter.IsConfigFileName(Path.GetFileName(path)))
             return SelectionKind.ConfigFile;
 
         // Only whitelisted web-asset extensions are compile-eligible.
@@ -141,7 +138,9 @@ internal abstract class VsCommandBase
             if (Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SDTE)) is not DTE dte)
                 return;
 
-            string configPath = Path.Combine(projectRoot, ConfigWriter.ConfigFileName);
+            string? configPath = ConfigWriter.GetConfigPath(projectRoot);
+            if (configPath is null)
+                return;
 
             foreach (Project project in dte.Solution.Projects)
             {
@@ -214,7 +213,7 @@ internal abstract class VsCommandBase
     {
         // Only start watch if the config file actually exists —
         // never watch a directory where mateconfig.json hasn't been created yet.
-        if (!File.Exists(Path.Combine(workingDirectory, ConfigWriter.ConfigFileName)))
+        if (ConfigWriter.GetConfigPath(workingDirectory) is null)
             return;
 
         AsyncPackage package = Package;

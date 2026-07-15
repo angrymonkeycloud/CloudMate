@@ -57,23 +57,26 @@ internal sealed class AutoConfigureVsCommand : VsCommandBase
 
         Log($"> mate auto-configure  [{root}]");
 
-        ConfigWriter.AutoConfigureResult result = ConfigWriter.AutoConfigureFiles(root);
+        _ = Task.Run(() =>
+        {
+            ConfigWriter.AutoConfigureResult result = ConfigWriter.AutoConfigureFiles(root);
 
-        // Phase 1: clean summary
-        if (result.Cleaned.EntriesRemoved > 0)
-            Log($"  Removed {result.Cleaned.EntriesRemoved} stale entr{(result.Cleaned.EntriesRemoved == 1 ? "y" : "ies")} with missing input files.");
-        if (result.Cleaned.InputsRemoved > 0)
-            Log($"  Pruned {result.Cleaned.InputsRemoved} missing input path{(result.Cleaned.InputsRemoved == 1 ? "" : "s")} from array inputs.");
+            if (result.Cleaned.EntriesRemoved > 0)
+                CloudMatePackage.OutputLine(Package, $"  Removed {result.Cleaned.EntriesRemoved} stale entr{(result.Cleaned.EntriesRemoved == 1 ? "y" : "ies")} with missing input files.");
+            if (result.Cleaned.InputsRemoved > 0)
+                CloudMatePackage.OutputLine(Package, $"  Pruned {result.Cleaned.InputsRemoved} missing input path{(result.Cleaned.InputsRemoved == 1 ? "" : "s")} from array inputs.");
 
-        // Phase 2: add summary
-        if (result.Added > 0)
-            Log($"  Added {result.Added} file{(result.Added == 1 ? "" : "s")} to mateconfig.json.");
-        else if (result.AlreadyConfigured > 0)
-            Log("  Nothing new to configure.");
-        else
-            Log("  No compilable source files found in the project.");
+            if (result.Added > 0)
+                CloudMatePackage.OutputLine(Package, $"  Added {result.Added} file{(result.Added == 1 ? "" : "s")} to mateconfig.json.");
+            else if (result.AlreadyConfigured > 0)
+                CloudMatePackage.OutputLine(Package, "  Nothing new to configure.");
+            else
+                CloudMatePackage.OutputLine(Package, "  No compilable source files found in the project.");
 
-        if (result.AlreadyConfigured > 0)
-            Log($"  {result.AlreadyConfigured} file{(result.AlreadyConfigured == 1 ? " was" : "s were")} already configured.");
+            if (result.AlreadyConfigured > 0)
+                CloudMatePackage.OutputLine(Package, $"  {result.AlreadyConfigured} file{(result.AlreadyConfigured == 1 ? " was" : "s were")} already configured.");
+
+            EnsureAlwaysWatching(root);
+        });
     }
 }

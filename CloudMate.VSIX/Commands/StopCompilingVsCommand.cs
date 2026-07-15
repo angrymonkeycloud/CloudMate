@@ -76,12 +76,6 @@ internal sealed class StopCompilingVsCommand : VsCommandBase
                 ? $"[compile] stopped: {r.Input} ({r.Message})"
                 : $"[compile] {r.Message}");
 
-            if (r.Added)
-            {
-                CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
-                RunBuild(root, Array.Empty<string>());
-            }
-
             EnsureAlwaysWatching(root);
         });
     }

@@ -47,6 +47,61 @@
     <Reference Include="System.Design" />
   </ItemGroup>
 
+  <!-- Build and package the supported .NET CLI with the extension. The VSIX must never
+       resolve the deprecated npm `mate.cmd` from PATH. -->
+  <ItemGroup>
+    <ProjectReference Include="..\CloudMate.CLI\CloudMate.CLI.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true" />
+
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\mate.dll" Link="Tools\mate.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\mate.deps.json" Link="Tools\mate.deps.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\mate.runtimeconfig.json" Link="Tools\mate.runtimeconfig.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\AngryMonkey.CloudMate.Bundler.dll" Link="Tools\AngryMonkey.CloudMate.Bundler.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\Acornima.dll" Link="Tools\Acornima.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\Jint.dll" Link="Tools\Jint.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\Microsoft.Extensions.FileSystemGlobbing.dll" Link="Tools\Microsoft.Extensions.FileSystemGlobbing.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\NUglify.dll" Link="Tools\NUglify.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\SkiaSharp.dll" Link="Tools\SkiaSharp.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\YamlDotNet.dll" Link="Tools\YamlDotNet.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CloudMate.CLI\bin\$(Configuration)\net10.0\runtimes\win-x64\native\libSkiaSharp.dll"
+             Link="Tools\runtimes\win-x64\native\libSkiaSharp.dll">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>

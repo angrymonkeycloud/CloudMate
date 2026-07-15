@@ -80,17 +80,8 @@ internal sealed class CompressFolderVsCommand : VsCommandBase
                 ? $"[compress] {r.Input} -> {r.Output}  (added to {Path.GetFileName(r.ConfigPath)})"
                 : $"[compress] {r.Message}");
 
-            if (r.Added)
-            {
-                ThreadHelper.JoinableTaskFactory.Run(async delegate
-                {
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                    EnsureConfigItemProperties(root);
-                });
-            }
-
-            CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
-            RunBuild(root, Array.Empty<string>());
+            CloudMatePackage.OutputLine(Package, $"> mate --recompress  [{root}]");
+            RunBuild(root, ["--recompress"]);
             EnsureAlwaysWatching(root);
         });
     }

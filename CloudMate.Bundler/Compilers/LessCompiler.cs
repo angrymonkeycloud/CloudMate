@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Jint;
 
@@ -150,7 +151,10 @@ internal static class LessCompiler
 
             string requestJson = JsonSerializer.Serialize(new
             {
-                input = File.ReadAllText(filePath),
+                // Less understands calc() as a protected calculation context, but evaluates
+                // arithmetic inside min/max/clamp. Wrap those CSS functions before parsing so
+                // expressions such as max(320px, 100vh - 4rem) remain browser-evaluated.
+                input = ProtectCssMathFunctions(File.ReadAllText(filePath)),
                 filename = fullPath
             });
 
@@ -219,4 +223,130 @@ internal static class LessCompiler
 
         return null;
     }
+
+    private static string ProtectCssMathFunctions(string source)
+    {
+        StringBuilder result = new(source.Length);
+
+        for (int index = 0; index < source.Length;)
+        {
+            if (StartsComment(source, index, out int commentEnd))
+            {
+                result.Append(source, index, commentEnd - index);
+                index = commentEnd;
+                continue;
+            }
+
+            if (source[index] is '\'' or '"')
+            {
+                int stringEnd = FindStringEnd(source, index);
+                result.Append(source, index, stringEnd - index);
+                index = stringEnd;
+                continue;
+            }
+
+            if (TryFindCssMathCall(source, index, out int openingParen, out int closingParen))
+            {
+                result.Append("calc(");
+                result.Append(source, index, closingParen - index + 1);
+                result.Append(')');
+                index = closingParen + 1;
+                continue;
+            }
+
+            result.Append(source[index++]);
+        }
+
+        return result.ToString();
+    }
+
+    private static bool TryFindCssMathCall(string source, int index, out int openingParen, out int closingParen)
+    {
+        openingParen = closingParen = -1;
+        if (index > 0 && IsIdentifierCharacter(source[index - 1]))
+            return false;
+
+        string? name = null;
+        foreach (string candidate in new[] { "clamp", "min", "max" })
+        {
+            if (source.AsSpan(index).StartsWith(candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                name = candidate;
+                break;
+            }
+        }
+
+        if (name is null)
+            return false;
+
+        int afterName = index + name.Length;
+        if (afterName >= source.Length || IsIdentifierCharacter(source[afterName]))
+            return false;
+
+        openingParen = afterName;
+        while (openingParen < source.Length && char.IsWhiteSpace(source[openingParen]))
+            openingParen++;
+
+        if (openingParen >= source.Length || source[openingParen] != '(')
+            return false;
+
+        closingParen = FindClosingParen(source, openingParen);
+        return closingParen >= 0;
+    }
+
+    private static int FindClosingParen(string source, int openingParen)
+    {
+        int depth = 0;
+        for (int index = openingParen; index < source.Length; index++)
+        {
+            if (StartsComment(source, index, out int commentEnd))
+            {
+                index = commentEnd - 1;
+                continue;
+            }
+
+            if (source[index] is '\'' or '"')
+            {
+                index = FindStringEnd(source, index) - 1;
+                continue;
+            }
+
+            if (source[index] == '(') depth++;
+            else if (source[index] == ')' && --depth == 0) return index;
+        }
+
+        return -1;
+    }
+
+    private static bool StartsComment(string source, int index, out int end)
+    {
+        end = index;
+        if (index + 1 >= source.Length || source[index] != '/' || source[index + 1] != '*')
+            return false;
+
+        int terminator = source.IndexOf("*/", index + 2, StringComparison.Ordinal);
+        end = terminator < 0 ? source.Length : terminator + 2;
+        return true;
+    }
+
+    private static int FindStringEnd(string source, int start)
+    {
+        char quote = source[start++];
+        while (start < source.Length)
+        {
+            if (source[start++] == '\\' && start < source.Length)
+            {
+                start++;
+                continue;
+            }
+
+            if (source[start - 1] == quote)
+                break;
+        }
+
+        return start;
+    }
+
+    private static bool IsIdentifierCharacter(char value)
+        => char.IsLetterOrDigit(value) || value is '_' or '-';
 }

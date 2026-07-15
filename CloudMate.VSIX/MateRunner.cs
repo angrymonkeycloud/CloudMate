@@ -1,14 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AngryMonkey.CloudMate.VisualStudio;
 
 /// <summary>
-/// Shared helper: locates the <c>mate</c> dotnet tool on PATH and runs it as a process.
+/// Shared helper: runs the .NET CloudMate CLI bundled with the extension.
 /// </summary>
 internal static class MateRunner
 {
@@ -18,11 +18,7 @@ internal static class MateRunner
     private static Action<string>? _watchError;
     private static bool _watchStopRequested;
     private static readonly object _watchLock = new();
-
-    private static FileSystemWatcher? _configWatcher;
-    private static string? _configWatcherPath;
-    private static DateTime _lastConfigReloadUtc;
-    private static bool _configDeleted;
+    private static readonly SemaphoreSlim _runGate = new(1, 1);
 
     public static bool IsWatching
     {
@@ -50,10 +46,7 @@ internal static class MateRunner
 
             if (_watchProcess is { HasExited: false }
                 && string.Equals(_watchProcess.StartInfo.WorkingDirectory, workingDirectory, StringComparison.OrdinalIgnoreCase))
-            {
-                EnsureConfigWatcher(workingDirectory);
                 return;
-            }
 
             if (_watchProcess is { HasExited: false })
             {
@@ -64,7 +57,6 @@ internal static class MateRunner
             }
 
             _watchStopRequested = false;
-            EnsureConfigWatcher(workingDirectory);
             logAfterLock = StartWatchInternal();
             logCallback = output;
         }
@@ -77,22 +69,35 @@ internal static class MateRunner
     /// <summary>Runs <c>mate [args]</c> in <paramref name="workingDirectory"/> and streams output to <paramref name="output"/>.</summary>
     public static void Run(string workingDirectory, string[] args, Action<string> output, Action<string> error)
     {
-        string exe = FindMate();
+        if (!_runGate.Wait(0))
+        {
+            output("[CloudMate] A build is already running; duplicate request skipped.");
+            return;
+        }
 
-        ProcessStartInfo psi = CreateStartInfo(exe, args, workingDirectory);
+        try
+        {
+            string exe = FindMate();
 
-        using Process proc = new() { StartInfo = psi };
+            ProcessStartInfo psi = CreateStartInfo(exe, args, workingDirectory);
 
-        proc.OutputDataReceived += (_, e) => { if (e.Data is not null) output(e.Data); };
-        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) error(e.Data); };
+            using Process proc = new() { StartInfo = psi };
 
-        proc.Start();
-        proc.BeginOutputReadLine();
-        proc.BeginErrorReadLine();
-        proc.WaitForExit();
+            proc.OutputDataReceived += (_, e) => { if (e.Data is not null) output(e.Data); };
+            proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) error(e.Data); };
 
-        if (proc.ExitCode != 0)
-            error($"[CloudMate] mate exited with code {proc.ExitCode}.");
+            proc.Start();
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+            proc.WaitForExit();
+
+            if (proc.ExitCode != 0)
+                error($"[CloudMate] mate exited with code {proc.ExitCode}.");
+        }
+        finally
+        {
+            _runGate.Release();
+        }
     }
 
     /// <summary>Starts <c>mate --watch</c> in the background. Kept for backward compatibility; delegates to EnsureWatch.</summary>
@@ -107,7 +112,7 @@ internal static class MateRunner
 
         string watchDirectory = _watchWorkingDirectory!;
         string exe = FindMate();
-        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch" }, watchDirectory);
+        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch", "--no-initial-build" }, watchDirectory);
 
         Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) _watchOutput(e.Data); };
@@ -120,7 +125,7 @@ internal static class MateRunner
 
         _watchProcess = proc;
         // Return the message; caller must emit it AFTER releasing _watchLock.
-        return $"[CloudMate] watch started in '{_watchWorkingDirectory}'.";
+        return $"[CloudMate] bundled .NET watch started in '{_watchWorkingDirectory}'.";
     }
 
     private static void OnWatchExited()
@@ -139,11 +144,12 @@ internal static class MateRunner
             if (_watchStopRequested)
                 return;
 
-            if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
+            string? workingDirectory = _watchWorkingDirectory;
+            if (workingDirectory is null || workingDirectory.Length == 0 || _watchOutput is null || _watchError is null)
                 return;
 
             // Don't restart if the config file was deleted while the watch was running.
-            if (!File.Exists(Path.Combine(_watchWorkingDirectory, ConfigWriter.ConfigFileName)))
+            if (ConfigWriter.GetConfigPath(workingDirectory) is null)
             {
                 logError = _watchError;
                 errorAfterLock = "[CloudMate] mateconfig.json not found. watch will not restart.";
@@ -206,7 +212,6 @@ internal static class MateRunner
         lock (_watchLock)
         {
             _watchStopRequested = true;
-            _configDeleted = false;
 
             if (_watchProcess is not null)
             {
@@ -215,93 +220,7 @@ internal static class MateRunner
                 _watchProcess = null;
             }
 
-            DisposeConfigWatcher();
         }
-    }
-
-    private static void EnsureConfigWatcher(string workingDirectory)
-    {
-        string configPath = Path.Combine(workingDirectory, ConfigWriter.ConfigFileName);
-
-        if (_configWatcher is not null
-            && string.Equals(_configWatcherPath, configPath, StringComparison.OrdinalIgnoreCase))
-            return;
-
-        DisposeConfigWatcher();
-
-        _configWatcherPath = configPath;
-        _configWatcher = new FileSystemWatcher(workingDirectory, ConfigWriter.ConfigFileName)
-        {
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size | NotifyFilters.FileName,
-            IncludeSubdirectories = false,
-            EnableRaisingEvents = true
-        };
-
-        _configWatcher.Changed += (_, _) => ReloadWatchOnConfigChanged();
-        _configWatcher.Created += (_, _) => ReloadWatchOnConfigChanged();
-        _configWatcher.Renamed += (_, _) => ReloadWatchOnConfigChanged();
-        _configWatcher.Deleted += (_, _) => ReloadWatchOnConfigChanged();
-    }
-
-    private static void ReloadWatchOnConfigChanged()
-    {
-        string? logAfterLock = null;
-        string? noticeAfterLock = null;
-        Action<string>? logOutput = null;
-
-        lock (_watchLock)
-        {
-            if (_watchStopRequested || string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
-                return;
-
-            // Debounce duplicate file events from save operations.
-            DateTime now = DateTime.UtcNow;
-            if ((now - _lastConfigReloadUtc).TotalMilliseconds < 250)
-                return;
-            _lastConfigReloadUtc = now;
-
-            logOutput = _watchOutput;
-
-            // Config deleted — kill the running process but stay armed so a re-creation restarts it.
-            if (!File.Exists(Path.Combine(_watchWorkingDirectory!, ConfigWriter.ConfigFileName)))
-            {
-                noticeAfterLock = "[CloudMate] mateconfig.json deleted. watch stopped.";
-                _configDeleted = true;
-
-                if (_watchProcess is { HasExited: false })
-                {
-                    KillProcessTree(_watchProcess);
-                    _watchProcess.Dispose();
-                    _watchProcess = null;
-                }
-            }
-            else
-            {
-                // Config created or changed — clear any previous deletion state and (re)start.
-                _configDeleted = false;
-                noticeAfterLock = _watchProcess is { HasExited: false }
-                    ? "[CloudMate] mateconfig.json changed. reloading watch..."
-                    : "[CloudMate] mateconfig.json created. starting watch...";
-
-                if (_watchProcess is { HasExited: false })
-                {
-                    _watchStopRequested = true;
-                    KillProcessTree(_watchProcess);
-                    _watchProcess.Dispose();
-                    _watchProcess = null;
-                }
-
-                _watchStopRequested = false;
-                logAfterLock = StartWatchInternal();
-            }
-        }
-
-        // Emit log lines AFTER the lock is released so OutputLine never blocks while _watchLock is held.
-        if (noticeAfterLock is not null)
-            logOutput?.Invoke(noticeAfterLock);
-
-        if (logAfterLock is not null)
-            logOutput?.Invoke(logAfterLock);
     }
 
     /// <summary>
@@ -340,29 +259,20 @@ internal static class MateRunner
         catch { /* already exited */ }
     }
 
-    private static void DisposeConfigWatcher()
-    {
-        try
-        {
-            if (_configWatcher is not null)
-            {
-                _configWatcher.EnableRaisingEvents = false;
-                _configWatcher.Dispose();
-                _configWatcher = null;
-            }
-        }
-        catch { }
-
-        _configWatcherPath = null;
-    }
-
     /// <summary>
-    /// Finds the <c>mate</c> executable. Throws <see cref="FileNotFoundException"/> with
-    /// install instructions when the tool is not on PATH.
+    /// Finds the supported .NET CloudMate engine. The deprecated npm command is deliberately
+    /// never resolved from PATH because it can terminate the entire watch process on one bad glob.
     /// </summary>
     private static string FindMate()
     {
-        // Try the well-known dotnet tools path first to avoid relying solely on PATH.
+        string extensionDirectory = Path.GetDirectoryName(typeof(MateRunner).Assembly.Location)
+            ?? throw new FileNotFoundException("Could not determine the CloudMate extension directory.");
+        string bundledMate = Path.Combine(extensionDirectory, "Tools", "mate.dll");
+
+        if (File.Exists(bundledMate))
+            return bundledMate;
+
+        // Development fallback: accept only the .NET tool executable, never npm's mate.cmd.
         string userToolsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".dotnet", "tools", "mate.exe");
@@ -370,66 +280,22 @@ internal static class MateRunner
         if (File.Exists(userToolsPath))
             return userToolsPath;
 
-        // Fall back to PATH resolution via where.exe.
-        using Process where = new()
-        {
-            StartInfo = new ProcessStartInfo("where", "mate")
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            }
-        };
-
-        where.Start();
-
-        List<string> candidates = [];
-        while (!where.StandardOutput.EndOfStream)
-        {
-            string? line = where.StandardOutput.ReadLine()?.Trim();
-            if (!string.IsNullOrEmpty(line) && File.Exists(line))
-                candidates.Add(line!);
-        }
-
-        where.WaitForExit();
-
-        string? preferred = candidates.FirstOrDefault(path =>
-            path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
-
-        preferred ??= candidates.FirstOrDefault(path =>
-            path.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".bat", StringComparison.OrdinalIgnoreCase));
-
-        preferred ??= candidates.FirstOrDefault();
-
-        if (!string.IsNullOrEmpty(preferred))
-            return preferred;
-
         throw new FileNotFoundException(
-            "The 'mate' CLI tool was not found. " +
-            "Install it with: dotnet tool install -g AngryMonkey.CloudMate.CLI");
+            $"The bundled .NET CloudMate engine was not found at '{bundledMate}'. Reinstall the CloudMate VSIX.");
     }
 
     private static ProcessStartInfo CreateStartInfo(string matePath, string[] args, string workingDirectory)
     {
-        string joinedArgs = string.Join(" ", args);
+        string joinedArgs = string.Join(" ", args.Select(QuoteArgument));
+        string executable = matePath;
 
-        // .cmd/.bat shims must be launched through cmd.exe when UseShellExecute=false.
-        if (matePath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-            || matePath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
+        if (matePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
-            string cmdArgs = "/c \"\"" + matePath + "\"" + (string.IsNullOrWhiteSpace(joinedArgs) ? string.Empty : " " + joinedArgs) + "\"";
-            return new ProcessStartInfo("cmd.exe", cmdArgs)
-            {
-                WorkingDirectory = workingDirectory,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
+            executable = FindDotNetHost();
+            joinedArgs = $"{QuoteArgument(matePath)}{(joinedArgs.Length == 0 ? string.Empty : " " + joinedArgs)}";
         }
 
-        return new ProcessStartInfo(matePath, joinedArgs)
+        return new ProcessStartInfo(executable, joinedArgs)
         {
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
@@ -438,4 +304,26 @@ internal static class MateRunner
             CreateNoWindow = true
         };
     }
+
+    private static string FindDotNetHost()
+    {
+        string? dotNetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrWhiteSpace(dotNetRoot))
+        {
+            string configuredHost = Path.Combine(dotNetRoot!, "dotnet.exe");
+            if (File.Exists(configuredHost))
+                return configuredHost;
+        }
+
+        string programFilesHost = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
+        if (File.Exists(programFilesHost))
+            return programFilesHost;
+
+        throw new FileNotFoundException(
+            ".NET 10 is required by the bundled CloudMate compiler. Install the .NET 10 runtime and restart Visual Studio.");
+    }
+
+    private static string QuoteArgument(string argument)
+        => "\"" + argument.Replace("\"", "\\\"") + "\"";
 }

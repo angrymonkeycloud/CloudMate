@@ -15,7 +15,7 @@ public static class MateConfigManager
     /// <summary>Error output sink.</summary>
     public static Action<string> LogError { get; set; } = Console.Error.WriteLine;
 
-    private const string ConfigFileName = "mateconfig.json";
+    private const string ConfigFileName = ".mateconfig.json";
 
     // ─── Result records ──────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ public static class MateConfigManager
     /// </summary>
     public static CleanConfigResult CleanConfig(string projectRoot)
     {
-        string configPath = Path.Combine(projectRoot, ConfigFileName);
+        string configPath = GetWritableConfigPath(projectRoot);
 
         if (!File.Exists(configPath))
             return new CleanConfigResult(0, 0);
@@ -59,7 +59,7 @@ public static class MateConfigManager
     /// </summary>
     public static AutoConfigureResult AutoConfigure(string projectRoot)
     {
-        string configPath = Path.Combine(projectRoot, ConfigFileName);
+        string configPath = GetWritableConfigPath(projectRoot);
 
         if (!File.Exists(configPath))
             File.WriteAllText(configPath, "{}\n");
@@ -91,7 +91,11 @@ public static class MateConfigManager
             string outputFileName = $"{Path.GetFileNameWithoutExtension(file)}.{outputExt}";
             string relativeOutput = CombineRelative(mappedDir, outputFileName);
 
-            files.Add(new JsonObject { ["input"] = relativeInput, ["output"] = relativeOutput });
+            JsonObject entry = new() { ["input"] = relativeInput, ["output"] = relativeOutput };
+            if (IsRazorComponentStyle(file))
+                entry["minify"] = false;
+
+            files.Add(entry);
             added++;
         }
 
@@ -122,6 +126,22 @@ public static class MateConfigManager
     };
 
     private static readonly string[] SourceFolderNames = ["src", "source"];
+
+    private static bool IsRazorComponentStyle(string sourceFile)
+    {
+        string extension = Path.GetExtension(sourceFile);
+        if (!extension.Equals(".less", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".scss", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".sass", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string withoutStyleExtension = Path.Combine(
+            Path.GetDirectoryName(sourceFile) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(sourceFile));
+
+        return withoutStyleExtension.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)
+            || File.Exists(withoutStyleExtension + ".razor");
+    }
 
     // ─── Clean helpers ───────────────────────────────────────────────────────────
 
@@ -167,6 +187,24 @@ public static class MateConfigManager
                 }
             }
         }
+    }
+
+    private static string GetWritableConfigPath(string projectRoot)
+    {
+        try
+        {
+            string existing = MateConfig.FindConfigurationFile(projectRoot);
+            string name = Path.GetFileName(existing);
+            if (name.Equals(".mateconfig", StringComparison.OrdinalIgnoreCase)
+                || name.Equals(".mateconfig.json", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("mateconfig.json", StringComparison.OrdinalIgnoreCase))
+                return existing;
+        }
+        catch (FileNotFoundException)
+        {
+        }
+
+        return Path.Combine(projectRoot, ConfigFileName);
     }
 
     private static bool InputPathExists(string input, string projectRoot)

@@ -29,4 +29,20 @@ public class CssMinifierTests
         Assert.Contains(".b", result);
         Assert.DoesNotContain("\n", result);
     }
+
+    [Fact]
+    public void Minify_PreservesModernCssMathFunctions()
+    {
+        string result = CssMinifier.Minify("""
+            .layout {
+                width: min(100%, 1200px);
+                height: max(320px, calc(100vh - 4rem));
+                font-size: clamp(1rem, 2vw, 2rem);
+            }
+            """);
+
+        Assert.Contains("min(100%,1200px)", result.Replace(" ", string.Empty));
+        Assert.Contains("max(320px,calc(100vh-4rem))", result.Replace(" ", string.Empty));
+        Assert.Contains("clamp(1rem,2vw,2rem)", result.Replace(" ", string.Empty));
+    }
 }

@@ -193,6 +193,78 @@ public class MateImageCompressorTests
     }
 
     [Fact]
+    public void Execute_WithMultipleOutputs_WritesEveryConfiguredDestination()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        WritePng(dir.Combine("photo.png"), 40, 40, SKColors.Yellow);
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.Images =
+        [
+            new MateConfigImage
+            {
+                Input = ["photo.png"],
+                Output = ["dist/one", "dist/two"]
+            }
+        ];
+
+        MateImageCompressor.Execute(config);
+
+        Assert.True(File.Exists(dir.Combine(Path.Combine("dist", "one", "photo.png"))));
+        Assert.True(File.Exists(dir.Combine(Path.Combine("dist", "two", "photo.png"))));
+    }
+
+    [Fact]
+    public void Execute_WhenOneImageFails_ContinuesWithRemainingImages()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("broken.png", "not a png");
+        WritePng(dir.Combine("valid.png"), 40, 40, SKColors.Green);
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.Images =
+        [
+            new MateConfigImage
+            {
+                Input = ["*.png"],
+                Output = ["dist"]
+            }
+        ];
+
+        MateImageCompressor.Execute(config);
+
+        Assert.True(File.Exists(dir.Combine(Path.Combine("dist", "valid.png"))));
+    }
+
+    [Fact]
+    public void Delete_WithOutputFormat_RemovesConvertedOutput()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        string sourcePath = dir.Combine("photo.png");
+        WritePng(sourcePath, 40, 40, SKColors.Yellow);
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        MateConfigImage image = new()
+        {
+            Input = ["photo.png"],
+            Output = ["dist"],
+            OutputFormat = "webp"
+        };
+        config.Images = [image];
+
+        MateImageCompressor.Execute(config);
+        string outputPath = dir.Combine(Path.Combine("dist", "photo.webp"));
+        Assert.True(File.Exists(outputPath));
+
+        MateImageCompressor.Delete(config, image, sourcePath);
+
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
     public void Execute_SvgInput_WritesMinifiedSvgWithoutCommentsOrExtraWhitespace()
     {
         using TempDirectory dir = new();

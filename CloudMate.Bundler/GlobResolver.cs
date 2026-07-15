@@ -56,6 +56,35 @@ internal static class GlobResolver
     /// <summary>Checks whether a path contains glob characters.</summary>
     public static bool IsGlob(string pattern) => pattern.Contains('*') || pattern.Contains('?');
 
+    /// <summary>
+    /// Determines whether a changed path is covered by a configured input pattern without
+    /// enumerating the project. Watchers use this to ignore unrelated file-system events.
+    /// </summary>
+    public static bool IsMatch(string pattern, string rootDirectory, string fullPath)
+    {
+        string root = Path.GetFullPath(rootDirectory);
+        string path = Path.GetFullPath(fullPath);
+        string relative = Path.GetRelativePath(root, path);
+
+        // A configuration is project-relative; never let a path outside the project match.
+        if (relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+            || Path.IsPathRooted(relative))
+            return false;
+
+        string normalizedPattern = pattern.Replace('\\', '/').TrimStart();
+        if (normalizedPattern.StartsWith("./", StringComparison.Ordinal))
+            normalizedPattern = normalizedPattern[2..];
+
+        string normalizedRelative = relative.Replace('\\', '/');
+
+        if (!IsGlob(normalizedPattern))
+            return string.Equals(normalizedPattern, normalizedRelative, StringComparison.OrdinalIgnoreCase);
+
+        Matcher matcher = new(StringComparison.OrdinalIgnoreCase);
+        matcher.AddInclude(normalizedPattern);
+        return matcher.Match(normalizedRelative).HasMatches;
+    }
+
     /// <summary>Returns the non-glob base directory of a pattern (the deepest literal directory).</summary>
     public static string GetBaseDirectory(string pattern, string rootDirectory)
     {

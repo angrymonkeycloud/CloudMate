@@ -43,7 +43,16 @@ public static class MateImageCompressor
             return;
 
         foreach (MateConfigImage image in config.Images)
-            QueueImages(config, image, @override: recompress);
+        {
+            try
+            {
+                QueueImages(config, image, @override: recompress);
+            }
+            catch (Exception ex)
+            {
+                LogError($"  Could not queue configured images: {ex.Message}");
+            }
+        }
 
         CompressImages();
     }
@@ -70,22 +79,33 @@ public static class MateImageCompressor
                     if (!@override && File.Exists(destinationPath))
                         continue;
 
-                    lock (_lock)
-                    {
-                        if (_queue.Any(item => string.Equals(item.FilePath, file, StringComparison.OrdinalIgnoreCase)))
-                            continue;
-
-                        _queue.Enqueue(new ImageQueueItem
-                        {
-                            FilePath = file,
-                            Destination = destination,
-                            OutputFileName = outputFileName,
-                            Config = imageConfig,
-                            OldSize = new FileInfo(file).Length
-                        });
-                    }
+                    Enqueue(file, destination, outputFileName, imageConfig);
                 }
             }
+    }
+
+    /// <summary>
+    /// Queues exactly one source image. This is used by file watching so a single save never
+    /// re-compresses every image in the configured folder.
+    /// </summary>
+    public static void QueueImage(MateConfig config, MateConfigImage imageConfig, string filePath)
+    {
+        string fullPath = Path.GetFullPath(filePath);
+        if (!File.Exists(fullPath) || !IsSupportedImagePath(fullPath))
+            return;
+
+        foreach (string input in imageConfig.Input)
+        {
+            if (!GlobResolver.IsMatch(input, config.RootDirectory, fullPath))
+                continue;
+
+            string baseDirectory = GetBaseDirectory(config, input);
+            foreach (string output in imageConfig.Output)
+            {
+                string destination = ResolveDestination(config, output, baseDirectory, fullPath);
+                Enqueue(fullPath, destination, GetOutputFileName(imageConfig, fullPath), imageConfig);
+            }
+        }
     }
 
     /// <summary>Drains the queue, compressing one image at a time. Safe to call from watcher events.</summary>
@@ -133,16 +153,91 @@ public static class MateImageCompressor
     /// <summary>Deletes the output that corresponds to a removed source file. Mirrors legacy MateCompressor.delete.</summary>
     public static void Delete(MateConfig config, MateConfigImage imageConfig, string filePath)
     {
-        foreach (string output in imageConfig.Output)
-            foreach (string input in imageConfig.Input)
+        string fullPath = Path.GetFullPath(filePath);
+
+        foreach (string input in imageConfig.Input)
+        {
+            if (!GlobResolver.IsMatch(input, config.RootDirectory, fullPath))
+                continue;
+
+            foreach (string output in imageConfig.Output)
             {
                 string baseDirectory = GetBaseDirectory(config, input);
-                string destination = ResolveDestination(config, output, baseDirectory, Path.GetFullPath(filePath));
-                string fileToDelete = Path.Combine(destination, GetOutputFileName(imageConfig, filePath));
+                string destination = ResolveDestination(config, output, baseDirectory, fullPath);
+                string fileToDelete = Path.Combine(destination, GetOutputFileName(imageConfig, fullPath));
 
-                if (File.Exists(fileToDelete))
-                    File.Delete(fileToDelete);
+                try
+                {
+                    if (File.Exists(fileToDelete))
+                        File.Delete(fileToDelete);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"  Could not delete '{fileToDelete}': {ex.Message}");
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// Mirrors deletion of a nested source directory into every configured output directory.
+    /// The root output directory is never removed: only a subdirectory that maps from a
+    /// recursive input is eligible.
+    /// </summary>
+    public static void DeleteDirectory(MateConfig config, MateConfigImage imageConfig, string inputPattern, string directoryPath)
+    {
+        if (!inputPattern.Contains("**", StringComparison.Ordinal))
+            return;
+
+        string baseDirectory = Path.GetFullPath(GetBaseDirectory(config, inputPattern));
+        string fullDirectory = Path.GetFullPath(directoryPath);
+        string relative = Path.GetRelativePath(baseDirectory, fullDirectory);
+
+        if (relative == "." || relative == ".." || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+            || Path.IsPathRooted(relative))
+            return;
+
+        foreach (string output in imageConfig.Output)
+        {
+            string outputDirectory = Path.GetFullPath(Path.Combine(config.RootDirectory, output));
+            string destination = Path.Combine(outputDirectory, relative);
+
+            try
+            {
+                if (Directory.Exists(destination))
+                    Directory.Delete(destination, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                LogError($"  Could not delete output directory '{destination}': {ex.Message}");
+            }
+        }
+    }
+
+    private static void Enqueue(string filePath, string destination, string outputFileName, MateConfigImage imageConfig)
+    {
+        FileInfo source = new(filePath);
+        if (!source.Exists)
+            return;
+
+        lock (_lock)
+        {
+            // The output location is part of the identity: one source can intentionally be
+            // written to multiple output folders or formats.
+            if (_queue.Any(item => string.Equals(item.FilePath, filePath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Destination, destination, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.OutputFileName, outputFileName, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            _queue.Enqueue(new ImageQueueItem
+            {
+                FilePath = filePath,
+                Destination = destination,
+                OutputFileName = outputFileName,
+                Config = imageConfig,
+                OldSize = source.Length
+            });
+        }
     }
 
     private static void Compress(ImageQueueItem item)
@@ -154,7 +249,7 @@ public static class MateImageCompressor
 
         if (sourceExtension == "svg")
         {
-            File.WriteAllText(destinationPath, MinifySvg(File.ReadAllText(item.FilePath)));
+            WriteAtomically(destinationPath, MinifySvg(File.ReadAllText(item.FilePath)));
             Log($"  {item.FilePath} -> {destinationPath}");
             return;
         }
@@ -175,9 +270,9 @@ public static class MateImageCompressor
 
         // Keep-smaller: when not changing format, prefer the original if re-encoding grew the file.
         if (item.Config.OutputFormat is null && encoded.Size > item.OldSize)
-            File.Copy(item.FilePath, destinationPath, overwrite: true);
+            WriteAtomically(destinationPath, File.ReadAllBytes(item.FilePath));
         else
-            File.WriteAllBytes(destinationPath, encoded.ToArray());
+            WriteAtomically(destinationPath, encoded.ToArray());
 
         if (!ReferenceEquals(resized, bitmap))
             resized.Dispose();
@@ -267,5 +362,23 @@ public static class MateImageCompressor
             fileName = $"{Path.GetFileNameWithoutExtension(fileName)}.{imageConfig.OutputFormat.ToLowerInvariant()}";
 
         return fileName;
+    }
+
+    private static void WriteAtomically(string destinationPath, string content)
+        => WriteAtomically(destinationPath, System.Text.Encoding.UTF8.GetBytes(content));
+
+    private static void WriteAtomically(string destinationPath, byte[] content)
+    {
+        string tempPath = Path.Combine(Path.GetDirectoryName(destinationPath)!, $".{Path.GetFileName(destinationPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllBytes(tempPath, content);
+            File.Move(tempPath, destinationPath, overwrite: true);
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+            catch { }
+        }
     }
 }

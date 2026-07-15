@@ -16,7 +16,8 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 /// </summary>
 internal static class ConfigWriter
 {
-    internal const string ConfigFileName = "mateconfig.json";
+    internal const string ConfigFileName = ".mateconfig.json";
+    internal static readonly string[] ConfigFileNames = [".mateconfig", ".mateconfig.json", "mateconfig.json"];
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -59,9 +60,18 @@ internal static class ConfigWriter
     /// </summary>
     public static string? GetConfigPath(string projectRoot)
     {
-        string configPath = Path.Combine(projectRoot, ConfigFileName);
-        return File.Exists(configPath) ? configPath : null;
+        foreach (string fileName in ConfigFileNames)
+        {
+            string configPath = Path.Combine(projectRoot, fileName);
+            if (File.Exists(configPath))
+                return configPath;
+        }
+
+        return null;
     }
+
+    public static bool IsConfigFileName(string fileName)
+        => ConfigFileNames.Any(candidate => string.Equals(candidate, fileName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Returns the path to the project's <c>mateconfig.json</c>, creating a minimal scaffold
@@ -69,19 +79,10 @@ internal static class ConfigWriter
     /// </summary>
     public static string EnsureConfigExists(string projectRoot)
     {
-        string configPath = Path.Combine(projectRoot, ConfigFileName);
+        string configPath = GetConfigPath(projectRoot) ?? Path.Combine(projectRoot, ConfigFileName);
 
-        bool created = false;
         if (!File.Exists(configPath))
-        {
             File.WriteAllText(configPath, "{}\n");
-            created = true;
-        }
-
-        // Project-file metadata update can trigger project-system work.
-        // Only do it when the config is first created to avoid UI hitches on every command.
-        if (created)
-            EnsureConfigProjectMetadata(projectRoot);
 
         return configPath;
     }
@@ -156,7 +157,7 @@ internal static class ConfigWriter
 
     // ─── Project metadata (Build Action / Copy settings) ─────────────────────
 
-    private static void EnsureConfigProjectMetadata(string projectRoot)
+    private static void EnsureConfigProjectMetadata(string projectRoot, string configFileName)
     {
         try
         {
@@ -175,14 +176,14 @@ internal static class ConfigWriter
             // Ensure: <Content Remove="mateconfig.json" />
             bool hasContentRemove = project.Elements(ns + "ItemGroup")
                 .Elements(ns + "Content")
-                .Any(e => string.Equals((string?)e.Attribute("Remove"), ConfigFileName, StringComparison.OrdinalIgnoreCase));
+                .Any(e => string.Equals((string?)e.Attribute("Remove"), configFileName, StringComparison.OrdinalIgnoreCase));
 
             // Ensure: <None Include="mateconfig.json"> ... Never ... </None>
             XElement? noneItem = project.Elements(ns + "ItemGroup")
                 .Elements(ns + "None")
                 .FirstOrDefault(e =>
-                    string.Equals((string?)e.Attribute("Include"), ConfigFileName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals((string?)e.Attribute("Update"), ConfigFileName, StringComparison.OrdinalIgnoreCase));
+                    string.Equals((string?)e.Attribute("Include"), configFileName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals((string?)e.Attribute("Update"), configFileName, StringComparison.OrdinalIgnoreCase));
 
             XElement? targetGroup = project.Elements(ns + "ItemGroup").LastOrDefault();
             if (targetGroup is null)
@@ -192,17 +193,17 @@ internal static class ConfigWriter
             }
 
             if (!hasContentRemove)
-                targetGroup.Add(new XElement(ns + "Content", new XAttribute("Remove", ConfigFileName)));
+                targetGroup.Add(new XElement(ns + "Content", new XAttribute("Remove", configFileName)));
 
             if (noneItem is null)
             {
-                noneItem = new XElement(ns + "None", new XAttribute("Include", ConfigFileName));
+                noneItem = new XElement(ns + "None", new XAttribute("Include", configFileName));
                 targetGroup.Add(noneItem);
             }
 
             // Normalize to explicit include-based None item.
             noneItem.SetAttributeValue("Update", null);
-            noneItem.SetAttributeValue("Include", ConfigFileName);
+            noneItem.SetAttributeValue("Include", configFileName);
 
             SetOrCreateElementValue(noneItem, ns + "CopyToOutputDirectory", "Never");
             SetOrCreateElementValue(noneItem, ns + "CopyToPublishDirectory", "Never");
@@ -336,15 +337,32 @@ internal static class ConfigWriter
         JsonObject root = Load(configPath);
         JsonArray files = GetOrCreateArray(root, "files");
 
-        if (EntryExists(files, relativeInput, relativeOutput))
+        bool disableMinify = IsRazorComponentStyle(sourceFile);
+        JsonObject? existingEntry = FindInputEntry(files, relativeInput);
+        if (existingEntry is not null)
+        {
+            if (disableMinify && existingEntry["minify"] is null)
+            {
+                existingEntry["minify"] = false;
+                Save(configPath, root);
+                return new Result(false, configPath, relativeInput, relativeOutput,
+                    "Component stylesheet updated with minify: false.");
+            }
+
             return new Result(false, configPath, relativeInput, relativeOutput,
                 "This compile entry already exists in mateconfig.json.");
+        }
 
-        files.Add(new JsonObject
+        JsonObject newEntry = new()
         {
             ["input"] = relativeInput,
             ["output"] = relativeOutput
-        });
+        };
+
+        if (disableMinify)
+            newEntry["minify"] = false;
+
+        files.Add(newEntry);
 
         Save(configPath, root);
         return new Result(true, configPath, relativeInput, relativeOutput);
@@ -398,7 +416,7 @@ internal static class ConfigWriter
         string relativeOutput = CombineRelative(mappedDirectory, outputFileName);
 
         if (configPath is null)
-            return new Result(false, Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
+            return new Result(false, GetConfigPath(projectRoot) ?? Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
                 "This file is not configured for compilation.");
 
         JsonObject root = Load(configPath);
@@ -495,7 +513,7 @@ internal static class ConfigWriter
         string relativeOutput = GetCompressOutput(projectRoot, relativeFolder);
 
         if (configPath is null)
-            return new Result(false, Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
+            return new Result(false, GetConfigPath(projectRoot) ?? Path.Combine(projectRoot, ConfigFileName), relativeInput, relativeOutput,
                 "This folder is not configured for compression.");
 
         JsonObject root = Load(configPath);
@@ -624,19 +642,39 @@ internal static class ConfigWriter
         // Phase 2: add unconfigured source files.
         int added = 0;
         int alreadyConfigured = 0;
+        JsonObject root = Load(configPath);
+        JsonArray files = GetOrCreateArray(root, "files");
 
         foreach (string file in DiscoverCompilableFiles(projectRoot))
         {
-            if (HasCompileFile(projectRoot, file))
+            string relativeInput = ToRelative(projectRoot, file);
+            if (FindInputEntry(files, relativeInput) is not null)
             {
                 alreadyConfigured++;
                 continue;
             }
 
-            Result result = AddCompileFile(projectRoot, file);
-            if (result.Added)
-                added++;
+            string sourceExtension = Path.GetExtension(file).TrimStart('.').ToLowerInvariant();
+            string outputExtension = CompileOutputExtensions.TryGetValue(sourceExtension, out string? mapped)
+                ? mapped
+                : sourceExtension;
+            string mappedDirectory = MapToOutput(projectRoot, GetRelativeDirectory(relativeInput));
+            string relativeOutput = CombineRelative(mappedDirectory, $"{Path.GetFileNameWithoutExtension(file)}.{outputExtension}");
+
+            JsonObject entry = new()
+            {
+                ["input"] = relativeInput,
+                ["output"] = relativeOutput
+            };
+            if (IsRazorComponentStyle(file))
+                entry["minify"] = false;
+
+            files.Add(entry);
+            added++;
         }
+
+        if (added > 0)
+            Save(configPath, root);
 
         return new AutoConfigureResult(added, alreadyConfigured, cleaned, configPath);
     }
@@ -697,6 +735,18 @@ internal static class ConfigWriter
 
     /// <summary>Checks whether a files/images array already contains an entry with the same input and output.</summary>
     private static bool EntryExists(JsonArray entries, string input, string output)
+        => FindEntry(entries, input, output) is not null;
+
+    private static JsonObject? FindInputEntry(JsonArray entries, string input)
+    {
+        foreach (JsonNode? node in entries)
+            if (node is JsonObject entry && ValueEquals(entry["input"], input))
+                return entry;
+
+        return null;
+    }
+
+    private static JsonObject? FindEntry(JsonArray entries, string input, string output)
     {
         foreach (JsonNode? node in entries)
         {
@@ -704,10 +754,26 @@ internal static class ConfigWriter
                 continue;
 
             if (ValueEquals(entry["input"], input) && ValueEquals(entry["output"], output))
-                return true;
+                return entry;
         }
 
-        return false;
+        return null;
+    }
+
+    private static bool IsRazorComponentStyle(string sourceFile)
+    {
+        string extension = Path.GetExtension(sourceFile);
+        if (!extension.Equals(".less", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".scss", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".sass", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string withoutStyleExtension = Path.Combine(
+            Path.GetDirectoryName(sourceFile) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(sourceFile));
+
+        return withoutStyleExtension.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)
+            || File.Exists(withoutStyleExtension + ".razor");
     }
 
     /// <summary>

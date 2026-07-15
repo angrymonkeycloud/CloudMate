@@ -78,12 +78,6 @@ internal sealed class StopCompressingVsCommand : VsCommandBase
                 ? $"[compress] stopped: {r.Input} ({r.Message})"
                 : $"[compress] {r.Message}");
 
-            if (r.Added)
-            {
-                CloudMatePackage.OutputLine(Package, $"> mate  [{root}]");
-                RunBuild(root, Array.Empty<string>());
-            }
-
             EnsureAlwaysWatching(root);
         });
     }

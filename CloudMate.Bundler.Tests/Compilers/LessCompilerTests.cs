@@ -78,4 +78,24 @@ public class LessCompilerTests
 
         Assert.Contains("min(280px, calc(100vw - 16px))", css);
     }
+
+    [Fact]
+    public void Compile_CssMathFunctions_PassThroughUnchanged()
+    {
+        using TempDirectory dir = new();
+        string entry = dir.WriteFile("math.less", """
+            .layout {
+                width: min(100%, 1200px);
+                height: max(320px, 100vh - 4rem);
+                font-size: clamp(1rem, 2vw, 2rem);
+            }
+            """);
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        string normalized = System.Text.RegularExpressions.Regex.Replace(css, @"\s+", string.Empty);
+        Assert.Contains("calc(min(100%,1200px))", normalized);
+        Assert.Contains("calc(max(320px,100vh-4rem))", normalized);
+        Assert.Contains("calc(clamp(1rem,2vw,2rem))", normalized);
+    }
 }

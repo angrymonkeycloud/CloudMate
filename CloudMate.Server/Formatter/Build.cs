@@ -26,9 +26,9 @@ public class CoreCSharpClass
 
 public class CoreCSharpSwitch
 {
-    public string Value { get; set; }
+    public string Value { get; set; } = string.Empty;
     public CoreCSharpSwitchCase[] Cases { get; set; } = [];
-    public CoreCSharpSwitchDefault Default { get; set; }
+    public CoreCSharpSwitchDefault Default { get; set; } = new();
 
     public CoreCSharpSwitch()
     {
@@ -83,7 +83,7 @@ public class CoreCSharpSwitch
 
 public class CoreCSharpSwitchCase
 {
-    public string Condition { get; set; }
+    public string Condition { get; set; } = string.Empty;
     public string[] Statements { get; set; } = [];
 
     public CoreCSharpSwitchCase()
@@ -193,7 +193,7 @@ public class CoreCSharpSwitchDefault
 
 public class CoreCSharpIfCondition
 {
-    public string Condition { get; set; }
+    public string Condition { get; set; } = string.Empty;
     public string[] Statements { get; set; }
     public bool IsElseIf { get; set; } = false;
 
@@ -253,7 +253,7 @@ public class CoreCSharpIfCondition
 
 public class CoreCSharpElseCondition
 {
-    public string Condition { get; set; }
+    public string Condition { get; set; } = string.Empty;
     public string[] Statements { get; set; }
 
     public CoreCSharpElseCondition()

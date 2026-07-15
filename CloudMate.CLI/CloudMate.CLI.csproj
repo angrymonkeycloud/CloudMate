@@ -17,6 +17,7 @@
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>mate</ToolCommandName>
 		<PackageId>AngryMonkey.CloudMate.CLI</PackageId>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<!-- Memory-friendly runtime: workstation GC + conserve mode keeps long-running watch sessions light -->
 		<ServerGarbageCollection>false</ServerGarbageCollection>
 		<ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
@@ -27,6 +28,10 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\CloudMate.Bundler\CloudMate.Bundler.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\README.md" Pack="True" PackagePath="\" Link="README.md" />
 	</ItemGroup>
 
 </Project>

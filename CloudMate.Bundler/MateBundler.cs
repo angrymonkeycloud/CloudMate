@@ -43,6 +43,31 @@ public class MateBundler
             RunFiles(config, file, builds);
     }
 
+    /// <summary>
+    /// Builds only entries containing the supplied source path. This is used by editor integrations
+    /// so a right-click compile does not initialize every compiler or rebuild the entire project.
+    /// Returns the number of matching config entries.
+    /// </summary>
+    public static int ExecuteInput(MateConfig config, string inputPath, IReadOnlyList<string>? builds = null)
+    {
+        string fullInputPath = Path.IsPathRooted(inputPath)
+            ? Path.GetFullPath(inputPath)
+            : Path.GetFullPath(Path.Combine(config.RootDirectory, inputPath));
+
+        List<MateConfigFile> matches = config.Files
+            .Where(file => file.Input.Any(pattern => GlobResolver.IsMatch(pattern, config.RootDirectory, fullInputPath)))
+            .ToList();
+
+        if (matches.Count == 0)
+            return 0;
+
+        Log($"executed for {Path.GetRelativePath(config.RootDirectory, fullInputPath)} at {DateTime.Now.ToLongTimeString()}");
+        foreach (MateConfigFile file in matches)
+            RunFiles(config, file, builds);
+
+        return matches.Count;
+    }
+
     public static void RunFiles(MateConfig config, MateConfigFile file, IReadOnlyList<string>? builds)
     {
         if (builds is not null && builds.Count == 0)
@@ -108,6 +133,16 @@ public class MateBundler
 
         BundleResult bundle = Bundle(config, file.Input, outputExtension, build);
 
+        string outputPath = Path.Combine(resolvedOutputDirectory, outputFileName);
+        if (bundle.MatchedInputCount == 0)
+        {
+            DeleteOutputFiles(config, outputPath, outputExtension);
+            return;
+        }
+
+        if (bundle.Pieces.Count == 0)
+            throw new InvalidOperationException("No input files compiled successfully; existing output was preserved.");
+
         if (build.Js.Declaration)
             MateDeclarationGenerator.Write(bundle.Declarations, resolvedOutputDirectory, outputFileName);
 
@@ -115,15 +150,20 @@ public class MateBundler
 
         Directory.CreateDirectory(resolvedOutputDirectory);
 
-        string outputPath = Path.Combine(resolvedOutputDirectory, outputFileName);
         File.WriteAllText(outputPath, content);
         Log($"  {Path.GetRelativePath(config.RootDirectory, outputPath)}");
 
         string baseName = Path.GetFileNameWithoutExtension(outputFileName);
+        bool minify = file.Minify ?? outputExtension switch
+        {
+            "css" => build.Css.Minify,
+            "js" => build.Js.Minify,
+            _ => false
+        };
 
         switch (outputExtension)
         {
-            case "css" when build.Css.Minify:
+            case "css" when minify:
             {
                 string minPath = Path.Combine(resolvedOutputDirectory, $"{baseName}.min.css");
                 File.WriteAllText(minPath, CssMinifier.Minify(content));
@@ -131,17 +171,45 @@ public class MateBundler
                 break;
             }
 
-            case "js" when build.Js.Minify:
+            case "js" when minify:
             {
                 string minPath = Path.Combine(resolvedOutputDirectory, $"{baseName}.min.js");
                 File.WriteAllText(minPath, JsMinifier.Minify(content));
                 Log($"  {Path.GetRelativePath(config.RootDirectory, minPath)}");
                 break;
             }
+
+            case "css":
+                DeleteIfExists(config, Path.Combine(resolvedOutputDirectory, $"{baseName}.min.css"));
+                break;
+
+            case "js":
+                DeleteIfExists(config, Path.Combine(resolvedOutputDirectory, $"{baseName}.min.js"));
+                break;
         }
     }
 
-    private record BundleResult(List<string> Pieces, List<KeyValuePair<string, string>> Declarations);
+    private static void DeleteOutputFiles(MateConfig config, string outputPath, string outputExtension)
+    {
+        DeleteIfExists(config, outputPath);
+
+        string baseName = Path.GetFileNameWithoutExtension(outputPath);
+        string directory = Path.GetDirectoryName(outputPath)!;
+
+        if (outputExtension is "css" or "js")
+            DeleteIfExists(config, Path.Combine(directory, $"{baseName}.min.{outputExtension}"));
+    }
+
+    private static void DeleteIfExists(MateConfig config, string path)
+    {
+        if (!File.Exists(path))
+            return;
+
+        File.Delete(path);
+        Log($"  deleted {Path.GetRelativePath(config.RootDirectory, path)}");
+    }
+
+    private record BundleResult(List<string> Pieces, List<KeyValuePair<string, string>> Declarations, int MatchedInputCount);
 
     /// <summary>
     /// Groups input patterns by consecutive extension runs (legacy behavior) and compiles each group.
@@ -150,6 +218,7 @@ public class MateBundler
     {
         List<string> pieces = [];
         List<KeyValuePair<string, string>> declarations = [];
+        int matchedInputCount = 0;
 
         string groupExtension = string.Empty;
         List<string> groupedPatterns = [];
@@ -162,7 +231,7 @@ public class MateBundler
             {
                 if (groupedPatterns.Count > 0)
                 {
-                    CompileGroup(config, groupedPatterns, groupExtension, outputExtension, build, pieces, declarations);
+                    matchedInputCount += CompileGroup(config, groupedPatterns, groupExtension, outputExtension, build, pieces, declarations);
                     groupedPatterns = [];
                 }
 
@@ -173,12 +242,12 @@ public class MateBundler
         }
 
         if (groupedPatterns.Count > 0)
-            CompileGroup(config, groupedPatterns, groupExtension, outputExtension, build, pieces, declarations);
+            matchedInputCount += CompileGroup(config, groupedPatterns, groupExtension, outputExtension, build, pieces, declarations);
 
-        return new(pieces, declarations);
+        return new(pieces, declarations, matchedInputCount);
     }
 
-    private static void CompileGroup(
+    private static int CompileGroup(
         MateConfig config,
         List<string> patterns,
         string inputExtension,
@@ -190,7 +259,7 @@ public class MateBundler
         List<string> files = GlobResolver.Resolve(patterns, config.RootDirectory, missing => LogError($"File not found: {missing}"));
 
         if (files.Count == 0)
-            return;
+            return 0;
 
         if (inputExtension == outputExtension)
         {
@@ -200,7 +269,7 @@ public class MateBundler
                 catch (Exception exception) { LogError($"{file}: {exception.Message}"); }
             }
 
-            return;
+            return files.Count;
         }
 
         switch (inputExtension)
@@ -275,6 +344,8 @@ public class MateBundler
 
                 break;
         }
+
+        return files.Count;
     }
 
     private static string GetDirectoryName(string output)

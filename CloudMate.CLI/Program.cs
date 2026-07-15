@@ -26,6 +26,8 @@ bool showVersion = false;
 bool cleanMode = false;
 bool autoConfigMode = false;
 bool recompressMode = false;
+bool noInitialBuild = false;
+string? inputPath = null;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -38,6 +40,10 @@ for (int i = 0; i < args.Length; i++)
         case "-c": case "--clean":      cleanMode = true;      break;
         case "--autoconfig":            autoConfigMode = true; break;
         case "--recompress":            recompressMode = true; break;
+        case "--no-initial-build":      noInitialBuild = true; break;
+        case "--input" when i + 1 < args.Length:
+            inputPath = args[++i];
+            break;
         default:
             if (!args[i].StartsWith('-'))
                 positional.Add(args[i]);
@@ -70,6 +76,7 @@ if (showHelp)
     Console.WriteLine("  -c, --clean        remove entries with missing input files from mateconfig.json");
     Console.WriteLine("      --autoconfig   clean config and add all unconfigured .ts/.less/.scss/.sass files");
     Console.WriteLine("      --recompress   force re-compress all images even if output files already exist");
+    Console.WriteLine("      --input FILE   compile only config entries containing FILE");
     Console.WriteLine("  -h, --help         print this help");
     Console.WriteLine("  -v, --version      print CloudMate version");
     return 0;
@@ -141,11 +148,26 @@ IReadOnlyList<string>? builds = allBuilds ? null : (positional.Count > 0 ? posit
 
 if (watchMode)
 {
-    MateBundler.Execute(config, builds);
-    MateImageCompressor.Execute(config, recompress: recompressMode);
+    if (!noInitialBuild)
+    {
+        MateBundler.Execute(config, builds);
+        MateImageCompressor.Execute(config, recompress: recompressMode);
+    }
 
     using MateWatcher watcher = new(config, builds);
     watcher.WaitForExit();
+}
+else if (inputPath is not null)
+{
+    if (MateBundler.ExecuteInput(config, inputPath, builds) == 0)
+    {
+        MateBundler.LogError($"No mateconfig file entry contains '{inputPath}'.");
+        return 1;
+    }
+}
+else if (recompressMode)
+{
+    MateImageCompressor.Execute(config, recompress: true);
 }
 else
 {

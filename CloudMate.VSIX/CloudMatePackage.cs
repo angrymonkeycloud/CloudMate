@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using EnvDTE;
@@ -50,29 +53,55 @@ public sealed class CloudMatePackage : AsyncPackage
 
     private static IVsOutputWindowPane? _outputPane;
     private static readonly Guid OutputPaneGuid = new("C7F54A2E-1B3D-4E8F-9A0B-2D5E6F789012");
+    private static readonly ConcurrentQueue<string> OutputQueue = new();
+    private static int _outputFlushScheduled;
 
     /// <summary>
     /// Writes a line to the "CloudMate" output pane, creating it on first use.
     /// Safe to call from any thread: pane creation and activation are marshaled to the UI
     /// thread via fire-and-forget so the calling thread is never blocked.
     /// </summary>
-    internal static void OutputLine(IServiceProvider package, string message)
+    internal static void OutputLine(AsyncPackage package, string message)
     {
-        _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+        OutputQueue.Enqueue(message);
+        ScheduleOutputFlush(package);
+    }
+
+    private static void ScheduleOutputFlush(AsyncPackage package)
+    {
+        if (Interlocked.CompareExchange(ref _outputFlushScheduled, 1, 0) != 0)
+            return;
+
+        package.JoinableTaskFactory.RunAsync(async () =>
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            if (_outputPane is null
-                && Package.GetGlobalService(typeof(SVsOutputWindow)) is IVsOutputWindow outputWindow)
+            try
             {
-                Guid paneGuid = OutputPaneGuid;
-                outputWindow.CreatePane(ref paneGuid, "CloudMate", fInitVisible: 1, fClearWithSolution: 0);
-                outputWindow.GetPane(ref paneGuid, out _outputPane);
-            }
+                // Coalesce compiler bursts into one UI dispatch instead of one dispatch per output line.
+                await Task.Delay(75);
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            _outputPane?.OutputStringThreadSafe(message + Environment.NewLine);
-            _outputPane?.Activate();
-        });
+                if (_outputPane is null
+                    && Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(SVsOutputWindow)) is IVsOutputWindow outputWindow)
+                {
+                    Guid paneGuid = OutputPaneGuid;
+                    outputWindow.CreatePane(ref paneGuid, "CloudMate", fInitVisible: 1, fClearWithSolution: 0);
+                    outputWindow.GetPane(ref paneGuid, out _outputPane);
+                }
+
+                StringBuilder batch = new();
+                while (OutputQueue.TryDequeue(out string? line))
+                    batch.AppendLine(line);
+
+                if (batch.Length > 0)
+                    _outputPane?.OutputStringThreadSafe(batch.ToString());
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _outputFlushScheduled, 0);
+                if (!OutputQueue.IsEmpty)
+                    ScheduleOutputFlush(package);
+            }
+        }).FileAndForget("CloudMate/Output");
     }
 
     /// <summary>
@@ -96,6 +125,8 @@ public sealed class CloudMatePackage : AsyncPackage
             if (string.IsNullOrEmpty(solutionDir))
                 return;
 
+            List<string> projectDirectories = GetProjectDirectories(dte);
+
             // Capture 'this' reference for use in background task
             AsyncPackage package = this;
 
@@ -104,14 +135,14 @@ public sealed class CloudMatePackage : AsyncPackage
             {
                 try
                 {
-                    if (!Directory.Exists(solutionDir))
+                    string? configFile = projectDirectories
+                        .Select(ConfigWriter.GetConfigPath)
+                        .FirstOrDefault(path => path is not null)
+                        ?? ConfigWriter.GetConfigPath(solutionDir);
+                    if (configFile is null)
                         return;
 
-                    string[] configFiles = Directory.GetFiles(solutionDir, ConfigWriter.ConfigFileName, SearchOption.AllDirectories);
-                    if (configFiles.Length == 0)
-                        return;
-
-                    string watchDir = Path.GetDirectoryName(configFiles[0]) ?? string.Empty;
+                    string watchDir = Path.GetDirectoryName(configFile) ?? string.Empty;
                     if (string.IsNullOrEmpty(watchDir))
                         return;
 
@@ -132,5 +163,46 @@ public sealed class CloudMatePackage : AsyncPackage
         {
             OutputLine(this, $"[CloudMate] watch bootstrap skipped: {ex.Message}");
         }
+    }
+
+    private static List<string> GetProjectDirectories(DTE dte)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        List<string> directories = new();
+
+        void AddProject(Project? project)
+        {
+            if (project is null)
+                return;
+
+            try
+            {
+                string fullName = project.FullName;
+                if (!string.IsNullOrWhiteSpace(fullName))
+                {
+                    string? directory = Path.GetDirectoryName(fullName);
+                    if (!string.IsNullOrWhiteSpace(directory) && !directories.Contains(directory!, StringComparer.OrdinalIgnoreCase))
+                        directories.Add(directory!);
+                }
+            }
+            catch { }
+
+            try
+            {
+                foreach (ProjectItem item in project.ProjectItems)
+                    if (item.SubProject is Project subProject)
+                        AddProject(subProject);
+            }
+            catch { }
+        }
+
+        try
+        {
+            foreach (Project project in dte.Solution.Projects)
+                AddProject(project);
+        }
+        catch { }
+
+        return directories;
     }
 }

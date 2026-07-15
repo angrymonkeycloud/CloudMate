@@ -58,6 +58,99 @@ public class MateBundlerTests
     }
 
     [Fact]
+    public void ExecuteInput_BuildsOnlyTheSelectedConfigEntry()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("first.less", ".first { color: red; }");
+        dir.WriteFile("second.less", ".second { color: blue; }");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.GetBuild("dev")!.Css.Minify = false;
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["first.less"],
+            Output = ["dist/first.css"],
+            Builds = ["dev"]
+        });
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["second.less"],
+            Output = ["dist/second.css"],
+            Builds = ["dev"]
+        });
+
+        int matches = MateBundler.ExecuteInput(config, "first.less");
+
+        Assert.Equal(1, matches);
+        Assert.True(File.Exists(dir.Combine("dist/first.css")));
+        Assert.False(File.Exists(dir.Combine("dist/second.css")));
+    }
+
+    [Fact]
+    public void Execute_MissingJsInput_DoesNotStopOtherEntries()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("working.js", "window.cloudMateStillRuns = true;");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.GetBuild("dev")!.Js.Minify = false;
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["deleted.js"],
+            Output = ["dist/deleted.js"],
+            Builds = ["dev"]
+        });
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["working.js"],
+            Output = ["dist/working.js"],
+            Builds = ["dev"]
+        });
+
+        List<string> errors = [];
+        Action<string> originalLogError = MateBundler.LogError;
+        MateBundler.LogError = errors.Add;
+
+        try
+        {
+            MateBundler.Execute(config);
+        }
+        finally
+        {
+            MateBundler.LogError = originalLogError;
+        }
+
+        string workingOutput = dir.Combine("dist/working.js");
+        Assert.True(File.Exists(workingOutput));
+        Assert.Contains("cloudMateStillRuns", File.ReadAllText(workingOutput));
+        Assert.Contains(errors, error => error.Contains("deleted.js", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Execute_DeletedOnlyInput_RemovesStaleOutputs()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("dist/deleted.js", "stale output");
+        dir.WriteFile("dist/deleted.min.js", "stale minified output");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["deleted.js"],
+            Output = ["dist/deleted.js"],
+            Builds = ["dev"]
+        });
+
+        MateBundler.Execute(config);
+
+        Assert.False(File.Exists(dir.Combine("dist/deleted.js")));
+        Assert.False(File.Exists(dir.Combine("dist/deleted.min.js")));
+    }
+
+    [Fact]
     public void Execute_CompilesTypeScriptInput_EmitsJavaScriptAndDeclaration()
     {
         using TempDirectory dir = new();
@@ -106,6 +199,54 @@ public class MateBundlerTests
         string content = File.ReadAllText(outputPath);
         Assert.Contains(".foo", content);
         Assert.Contains("red", content);
+        Assert.True(File.Exists(dir.Combine("dist/app.min.css")));
+    }
+
+    [Fact]
+    public void Execute_PerFileMinifyFalse_WritesCssOnlyAndRemovesStaleMinifiedOutput()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("Component.razor.less", ".component { color: red; }");
+        dir.WriteFile("Component.razor.min.css", "stale");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        Assert.True(config.GetBuild("dev")!.Css.Minify);
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["Component.razor.less"],
+            Output = ["Component.razor.css"],
+            Builds = ["dev"],
+            Minify = false
+        });
+
+        MateBundler.Execute(config);
+
+        Assert.True(File.Exists(dir.Combine("Component.razor.css")));
+        Assert.False(File.Exists(dir.Combine("Component.razor.min.css")));
+    }
+
+    [Fact]
+    public void Execute_PerFileMinifyTrue_OverridesDisabledBuildMinification()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("site.less", ".site { color: blue; }");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.GetBuild("dev")!.Css.Minify = false;
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["site.less"],
+            Output = ["site.css"],
+            Builds = ["dev"],
+            Minify = true
+        });
+
+        MateBundler.Execute(config);
+
+        Assert.True(File.Exists(dir.Combine("site.css")));
+        Assert.True(File.Exists(dir.Combine("site.min.css")));
     }
 
     [Fact]

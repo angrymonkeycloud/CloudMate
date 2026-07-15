@@ -52,6 +52,24 @@ public class MateWatcherTests
     }
 
     [Fact]
+    public void Constructor_EntriesInSameDirectoryShareOneOperatingSystemWatcher()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("first.js", "console.log(1);");
+        dir.WriteFile("second.js", "console.log(2);");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.Files.Add(new MateConfigFile { Input = ["first.js"], Output = ["dist/first.js"] });
+        config.Files.Add(new MateConfigFile { Input = ["second.js"], Output = ["dist/second.js"] });
+
+        using MateWatcher watcher = new(config);
+
+        // One shared source watcher plus the specifically-filtered config watcher.
+        Assert.Equal(2, watcher.ActiveWatcherCount);
+    }
+
+    [Fact]
     public void Constructor_WithBuildsFilter_DoesNotThrow()
     {
         using TempDirectory dir = new();
@@ -138,5 +156,30 @@ public class MateWatcherTests
         {
             MateWatcher.LogError = originalLogError;
         }
+    }
+
+    [Fact]
+    public void UnconfiguredFileChange_DoesNotTriggerConfiguredBundle()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("app.js", "console.log(1);");
+        string unrelatedPath = dir.WriteFile("unrelated.js", "console.log('old');");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.GetBuild("dev")!.Js.Minify = false;
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["app.js"],
+            Output = ["dist/app.js"],
+            Builds = ["dev"]
+        });
+
+        using MateWatcher watcher = new(config);
+        Thread.Sleep(250);
+        File.WriteAllText(unrelatedPath, "console.log('new');");
+        Thread.Sleep(750);
+
+        Assert.False(File.Exists(dir.Combine(Path.Combine("dist", "app.js"))));
     }
 }

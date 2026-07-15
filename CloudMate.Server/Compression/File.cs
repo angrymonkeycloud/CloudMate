@@ -32,7 +32,7 @@ public partial class CloudCompression
         public readonly string FileName;
         public readonly object Content;
 
-        public byte[] AsBytes => IsBytes ? (byte[])Content : Encoding.UTF8.GetBytes(Content.ToString());
+        public byte[] AsBytes => IsBytes ? (byte[])Content : Encoding.UTF8.GetBytes(Content.ToString() ?? string.Empty);
 
         public int ContentLength => IsBytes ? ((byte[])Content).Length : Content.ToString()?.Length ?? 0;
     }

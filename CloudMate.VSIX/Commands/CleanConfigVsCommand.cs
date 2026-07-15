@@ -57,18 +57,23 @@ internal sealed class CleanConfigVsCommand : VsCommandBase
 
         Log($"> mate clean  [{root}]");
 
-        ConfigWriter.CleanResult result = ConfigWriter.CleanConfig(path, root);
-
-        if (result.EntriesRemoved == 0 && result.InputsRemoved == 0)
+        _ = Task.Run(() =>
         {
-            Log("  Nothing to clean — all input paths exist.");
-            return;
-        }
+            ConfigWriter.CleanResult result = ConfigWriter.CleanConfig(path, root);
 
-        if (result.EntriesRemoved > 0)
-            Log($"  Removed {result.EntriesRemoved} entr{(result.EntriesRemoved == 1 ? "y" : "ies")} with missing input files.");
+            if (result.EntriesRemoved == 0 && result.InputsRemoved == 0)
+            {
+                CloudMatePackage.OutputLine(Package, "  Nothing to clean — all input paths exist.");
+                return;
+            }
 
-        if (result.InputsRemoved > 0)
-            Log($"  Pruned {result.InputsRemoved} missing input path{(result.InputsRemoved == 1 ? "" : "s")} from array inputs.");
+            if (result.EntriesRemoved > 0)
+                CloudMatePackage.OutputLine(Package, $"  Removed {result.EntriesRemoved} entr{(result.EntriesRemoved == 1 ? "y" : "ies")} with missing input files.");
+
+            if (result.InputsRemoved > 0)
+                CloudMatePackage.OutputLine(Package, $"  Pruned {result.InputsRemoved} missing input path{(result.InputsRemoved == 1 ? "" : "s")} from array inputs.");
+
+            EnsureAlwaysWatching(root);
+        });
     }
 }
