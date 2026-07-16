@@ -240,7 +240,7 @@ No CloudMate commands appear for:
 
 CloudMate automatically maps source files under `src/` or `source/` to their corresponding location under `wwwroot/` whenever the project is a .NET project (contains a `.csproj`) **or** already has a `wwwroot` folder. The leading `src` / `source` segment is stripped:
 
-![CloudMate Auto-Configure option in the file context menu](Resources/compiling/wwwroot-src.png)
+![CloudMate Auto-Configure option in the file context menu](Resources/compiling/wwwroot-source.png)
 
 | Source file | Output file |
 |---|---|
