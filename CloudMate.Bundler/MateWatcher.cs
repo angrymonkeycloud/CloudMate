@@ -102,9 +102,37 @@ public sealed class MateWatcher : IDisposable
                         }
                     }, recursive, WatcherChangeTypes.Changed | WatcherChangeTypes.Created | WatcherChangeTypes.Deleted | WatcherChangeTypes.Renamed);
                 }
+
+                // LESS imports are dependencies of the configured entry but are normally not
+                // mateconfig inputs themselves. Watch every LESS file under the project so an
+                // imported partial in a sibling/different folder rebuilds this bundle as well.
+                // QueueFile's debounce coalesces this with the configured-input watcher when the
+                // changed file is the entry stylesheet itself.
+                if (file.Input.Any(IsLessInputPattern))
+                {
+                    MateConfigFile capturedFile = file;
+                    string capturedBuild = buildName;
+                    AddWatcher(_config.RootDirectory, "*.less", (_, e) =>
+                    {
+                        try
+                        {
+                            if (!IsExcludedPath(e.FullPath)
+                                && !IsBundleOutputPath(capturedFile, capturedBuild, e.FullPath))
+                                QueueFile(capturedFile, capturedBuild);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"LESS dependency watch error for '{e.FullPath}': {ex.Message}");
+                        }
+                    }, recursive: true,
+                    WatcherChangeTypes.Changed | WatcherChangeTypes.Created | WatcherChangeTypes.Deleted | WatcherChangeTypes.Renamed);
+                }
             }
         }
     }
+
+    private static bool IsLessInputPattern(string inputPattern)
+        => string.Equals(Path.GetExtension(inputPattern), ".less", StringComparison.OrdinalIgnoreCase);
 
     private void AttachConfigWatcher()
     {
@@ -331,6 +359,12 @@ public sealed class MateWatcher : IDisposable
                 _lastRunUtc.Clear();
                 AttachWatchers();
             }
+
+            // A configuration save can add a source that has never emitted an output, or
+            // change build/output options for an existing source. Rebuilding the configured
+            // file entries here makes the saved mateconfig take effect immediately instead of
+            // waiting for a later source-file change (or a manual Recompile command).
+            QueueConfiguredFiles(nextConfig);
         }
         catch (FileNotFoundException)
         {
@@ -341,6 +375,18 @@ public sealed class MateWatcher : IDisposable
         {
             // Keep the last valid watcher configuration alive when a save is temporarily invalid.
             LogError($"Could not reload configuration; keeping the current watch active: {ex.Message}");
+        }
+    }
+
+    private void QueueConfiguredFiles(MateConfig config)
+    {
+        foreach (MateConfigFile file in config.Files)
+        {
+            foreach (string buildName in file.Builds ?? ["dev"])
+            {
+                if (_builds is null || _builds.Contains(buildName))
+                    QueueFile(file, buildName);
+            }
         }
     }
 

@@ -11,6 +11,10 @@ namespace AngryMonkey.CloudMate;
 internal static class LessCompiler
 {
     private static readonly object _lock = new();
+    private static readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
     private static Engine? _engine;
 
     private const string BrowserShims =
@@ -52,7 +56,7 @@ internal static class LessCompiler
             supports: function () { return true; },
             supportsSync: function () { return true; },
             loadFileSync: function (filename, currentDirectory, options, environment) {
-                var resolved = __cm_less_resolve(filename, currentDirectory);
+                var resolved = __cm_less_resolve(filename, currentDirectory, options && options.ext);
 
                 if (resolved === null)
                     return { type: 'File', message: "'" + filename + "' wasn't found.", stack: '' };
@@ -201,13 +205,40 @@ internal static class LessCompiler
 
     private static string? ReadFile(string fileName)
     {
+        if (TryGetRemoteUri(fileName, out Uri? remoteUri))
+        {
+            try
+            {
+                return _httpClient.GetStringAsync(remoteUri).GetAwaiter().GetResult();
+            }
+            catch (HttpRequestException)
+            {
+                return null;
+            }
+            catch (TaskCanceledException)
+            {
+                return null;
+            }
+        }
+
         string path = fileName.Replace('/', Path.DirectorySeparatorChar);
 
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
-    private static string? Resolve(string fileName, string? currentDirectory)
+    private static string? Resolve(string fileName, string? currentDirectory, string? extension)
     {
+        if (TryGetRemoteUri(fileName, out Uri? remoteUri))
+            return AppendExtension(remoteUri!, extension).AbsoluteUri;
+
+        if (currentDirectory is not null
+            && TryGetRemoteUri(currentDirectory, out Uri? remoteDirectory)
+            && Uri.TryCreate(remoteDirectory, fileName, out Uri? resolvedRemoteUri)
+            && TryGetRemoteUri(resolvedRemoteUri.AbsoluteUri, out _))
+        {
+            return AppendExtension(resolvedRemoteUri, extension).AbsoluteUri;
+        }
+
         string candidate = fileName.Replace('/', Path.DirectorySeparatorChar);
 
         if (!Path.IsPathRooted(candidate) && currentDirectory is not null)
@@ -222,6 +253,31 @@ internal static class LessCompiler
             return $"{candidate.Replace('\\', '/')}.less";
 
         return null;
+    }
+
+    private static Uri AppendExtension(Uri uri, string? extension)
+    {
+        if (string.IsNullOrEmpty(extension) || Path.HasExtension(uri.AbsolutePath))
+            return uri;
+
+        UriBuilder builder = new(uri)
+        {
+            Path = uri.AbsolutePath + extension
+        };
+        return builder.Uri;
+    }
+
+    private static bool TryGetRemoteUri(string value, out Uri? uri)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? candidate)
+            && (candidate.Scheme == Uri.UriSchemeHttp || candidate.Scheme == Uri.UriSchemeHttps))
+        {
+            uri = candidate;
+            return true;
+        }
+
+        uri = null;
+        return false;
     }
 
     private static string ProtectCssMathFunctions(string source)

@@ -29,6 +29,56 @@ public class LessCompilerTests
     }
 
     [Fact]
+    public void Compile_ResolvesImportFromDifferentFolderRelativeToImportingFile()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(Path.Combine("styles", "shared", "_variables.less"), "@brand: rebeccapurple;\n");
+        dir.WriteFile(Path.Combine("styles", "components", "_button.less"),
+            "@import \"../shared/_variables\";\n.button { color: @brand; }\n");
+        string entry = dir.WriteFile(Path.Combine("styles", "pages", "site.less"),
+            "@import \"../components/_button\";\n");
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        Assert.Contains(".button", css);
+        Assert.Contains("rebeccapurple", css);
+    }
+
+    [Fact]
+    public void Compile_ResolvesRemoteUrlImport()
+    {
+        using TestHttpServer server = new(new Dictionary<string, string>
+        {
+            ["/cloud-variables.less"] = "@brand: rebeccapurple;\n"
+        });
+        using TempDirectory dir = new();
+        string entry = dir.WriteFile("remote.less",
+            $"@import url('{server.BaseUri}cloud-variables.less');\n.button {{ color: @brand; }}\n");
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        Assert.Contains(".button", css);
+        Assert.Contains("rebeccapurple", css);
+    }
+
+    [Fact]
+    public void Compile_ResolvesRelativeImportInsideRemoteFile()
+    {
+        using TestHttpServer server = new(new Dictionary<string, string>
+        {
+            ["/styles/main.less"] = "@import \"shared/_variables\";\n.remote { color: @brand; }\n",
+            ["/styles/shared/_variables.less"] = "@brand: dodgerblue;\n"
+        });
+        using TempDirectory dir = new();
+        string entry = dir.WriteFile("remote-nested.less", $"@import \"{server.BaseUri}styles/main.less\";\n");
+
+        string css = LessCompiler.Compile(entry, sourceMap: false);
+
+        Assert.Contains(".remote", css);
+        Assert.Contains("dodgerblue", css);
+    }
+
+    [Fact]
     public void Compile_NestedRules_CompilesToFlatCss()
     {
         using TempDirectory dir = new();
