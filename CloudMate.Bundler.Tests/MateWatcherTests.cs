@@ -159,6 +159,46 @@ public class MateWatcherTests
     }
 
     [Fact]
+    public void RapidExternalFileChanges_CompileFinalContent()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", "{}");
+        string inputPath = dir.WriteFile("agent.less", "@color: black;\n.agent { color: @color; }\n");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        config.GetBuild("dev")!.Css.Minify = false;
+        config.Files.Add(new MateConfigFile
+        {
+            Input = ["agent.less"],
+            Output = ["dist/agent.css"],
+            Builds = ["dev"]
+        });
+
+        using MateWatcher watcher = new(config);
+        Thread.Sleep(250);
+
+        // Simulate an external agent/editor that performs multiple writes as part of one save.
+        File.WriteAllText(inputPath, "@color: red;\n.agent { color: @color; }\n");
+        Thread.Sleep(50);
+        File.WriteAllText(inputPath, "@color: blue;\n.agent { color: @color; }\n");
+
+        string outputPath = dir.Combine(Path.Combine("dist", "agent.css"));
+        bool compiledFinalContent = false;
+        for (int i = 0; i < 40; i++)
+        {
+            if (File.Exists(outputPath) && File.ReadAllText(outputPath).Contains("blue"))
+            {
+                compiledFinalContent = true;
+                break;
+            }
+
+            Thread.Sleep(250);
+        }
+
+        Assert.True(compiledFinalContent, "Expected the watcher to compile the final content from a rapid external save.");
+    }
+
+    [Fact]
     public void UnconfiguredFileChange_DoesNotTriggerConfiguredBundle()
     {
         using TempDirectory dir = new();

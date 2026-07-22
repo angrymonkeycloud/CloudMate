@@ -112,7 +112,9 @@ internal static class MateRunner
 
         string watchDirectory = _watchWorkingDirectory!;
         string exe = FindMate();
-        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch", "--no-initial-build" }, watchDirectory);
+        // Always run the initial build. It reconciles source changes made before Visual Studio
+        // opened the project or while the extension/watch process was still starting.
+        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch" }, watchDirectory);
 
         Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) _watchOutput(e.Data); };

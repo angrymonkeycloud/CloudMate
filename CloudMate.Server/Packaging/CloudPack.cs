@@ -2,6 +2,7 @@
 using System.Xml.Linq;
 using System.Xml;
 using System.Reflection;
+using System.Text.Json;
 
 namespace AngryMonkey.CloudMate;
 
@@ -196,7 +197,7 @@ public class CloudPack(CloudPackConfig config)
                 {
                     // Double-check by looking for the actual package file
                     string version = GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? throw new Exception("Version is missing");
-                    string packagePath = $"./nupkgs/{project.AssemblyName}.{version}.nupkg";
+                    string packagePath = $"./nupkgs/{project.PackageId}.{version}.nupkg";
 
                     if (File.Exists(packagePath))
                     {
@@ -259,7 +260,7 @@ public class CloudPack(CloudPackConfig config)
             throw new ArgumentNullException(nameof(Config.NugetApiKey));
 
         string version = GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? throw new Exception("Version is missing");
-        string packagePath = $"./nupkgs/{project.AssemblyName}.{version}.nupkg";
+        string packagePath = $"./nupkgs/{project.PackageId}.{version}.nupkg";
         
         // Verify package exists before attempting to publish
         if (!File.Exists(packagePath))
@@ -497,9 +498,6 @@ public class CloudPack(CloudPackConfig config)
     public async Task Pack()
     {
         var packableProjects = Projects.Where(key => key.PackAndPublish).ToList();
-        
-        // Initialize the modern console logger
-        _logger.Initialize(packableProjects);
 
         string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
         string projectDirectory = Directory.GetParent(currentDirectory)!.FullName;
@@ -516,17 +514,27 @@ public class CloudPack(CloudPackConfig config)
 
         Version = GetProjectPropertyValue(sourceProject.Document, "PropertyGroup/Version");
 
+        if (string.IsNullOrEmpty(Version))
+            throw new Exception("Version is null.");
+
+        List<PackagePreflight> preflight = await GetPackagePreflight(packableProjects);
+        _logger.ShowPreflight(Version, preflight);
+
+        if (Config.ConfirmBeforePack && !_logger.ConfirmProceed())
+        {
+            Console.WriteLine("Packaging cancelled.");
+            return;
+        }
+
+        // Initialize only after confirmation, using the source project's target version.
+        _logger.Initialize(packableProjects, Version);
+
         // Update version
         foreach (CloudPackProject project in Projects.Where(key => key.UpdateVersion))
         {
-            if (string.IsNullOrEmpty(Version))
-                throw new Exception("Version is null.");
-
             UpdateProjectNode(project, "PropertyGroup/Version", Version);
             await UpdateProjectMetadata(project);
         }
-
-        _logger.LogHeading("Update Metadata Phase");
 
         // Update Metadata
         foreach (string metadata in MetadataProperies)
@@ -569,8 +577,6 @@ public class CloudPack(CloudPackConfig config)
         }
 
         // Clean and Build phase
-        _logger.LogHeading("Rebuild Phase");
-
         foreach (CloudPackProject project in packableProjects)
         {
             bool rebuildSuccess = await RebuildProject(project);
@@ -581,8 +587,6 @@ public class CloudPack(CloudPackConfig config)
         }
 
         // Pack phase
-        _logger.LogHeading("Pack Phase");
-
         List<CloudPackProject> successfullyPackedProjects = [];
 
         foreach (CloudPackProject project in packableProjects)
@@ -610,21 +614,59 @@ public class CloudPack(CloudPackConfig config)
         }
 
         // Publish phase
-        _logger.LogHeading("Publish Phase");
-
         foreach (CloudPackProject project in successfullyPackedProjects)
         {
             await PublishPackage(project);
         }
 
-        _logger.LogHeading("Process Complete");
         _logger.Complete();
     }
+
+    private async Task<List<PackagePreflight>> GetPackagePreflight(IEnumerable<CloudPackProject> projects)
+    {
+        using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+        Task<PackagePreflight>[] checks = projects.Select(async project =>
+        {
+            string packageId = project.PackageId;
+            string url = $"https://api.nuget.org/v3-flatcontainer/{Uri.EscapeDataString(packageId.ToLowerInvariant())}/index.json";
+
+            try
+            {
+                using HttpResponseMessage response = await client.GetAsync(url);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    return new PackagePreflight(project.Name, packageId, null, null);
+
+                response.EnsureSuccessStatusCode();
+                await using Stream content = await response.Content.ReadAsStreamAsync();
+                using JsonDocument json = await JsonDocument.ParseAsync(content);
+                string? currentVersion = json.RootElement.GetProperty("versions")
+                    .EnumerateArray()
+                    .Select(item => item.GetString())
+                    .LastOrDefault(item => !string.IsNullOrWhiteSpace(item));
+
+                return new PackagePreflight(project.Name, packageId, currentVersion, null);
+            }
+            catch (Exception ex)
+            {
+                return new PackagePreflight(project.Name, packageId, null, ex.Message);
+            }
+        }).ToArray();
+
+        return [.. await Task.WhenAll(checks)];
+    }
 }
+
+internal sealed record PackagePreflight(
+    string ProjectName,
+    string PackageId,
+    string? CurrentVersion,
+    string? LookupError);
 
 public class CloudPackConfig
 {
     public string? NugetApiKey { get; set; }
     public int MaxRetryAttempts { get; set; } = 3;
     public int RetryDelayMs { get; set; } = 2000;
+    public bool ConfirmBeforePack { get; set; } = true;
 }

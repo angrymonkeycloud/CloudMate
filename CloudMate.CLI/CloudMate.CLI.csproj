@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -10,9 +10,9 @@
 		<Authors>Angry Monkey</Authors>
 		<Company>Angry Monkey</Company>
 		<Description>CloudMate CLI — compile, bundle, compress, and watch web assets.</Description>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>$(Version)</AssemblyVersion>
-		<FileVersion>$(Version)</FileVersion>
+		<Version>1.3.5</Version>
+		<AssemblyVersion>$(PackageVersion)</AssemblyVersion>
+		<FileVersion>$(PackageVersion)</FileVersion>
 		<!-- dotnet tool metadata -->
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>mate</ToolCommandName>
@@ -24,7 +24,7 @@
 		<GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
 		<TieredPgo>true</TieredPgo>
 		<InvariantGlobalization>true</InvariantGlobalization>
-	</PropertyGroup>
+	<PackageIcon>amc-logo.png</PackageIcon></PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\CloudMate.Bundler\CloudMate.Bundler.csproj" />
@@ -34,4 +34,4 @@
 		<None Include="..\README.md" Pack="True" PackagePath="\" Link="README.md" />
 	</ItemGroup>
 
-</Project>
+<ItemGroup><None Update="amc-logo.png"><Pack>True</Pack><PackagePath>\</PackagePath></None></ItemGroup></Project>

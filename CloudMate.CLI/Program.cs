@@ -148,13 +148,16 @@ IReadOnlyList<string>? builds = allBuilds ? null : (positional.Count > 0 ? posit
 
 if (watchMode)
 {
+    // Arm filesystem notifications before the initial build. A file saved while a large project
+    // is being compiled will then be queued again instead of falling into a startup race window.
+    using MateWatcher watcher = new(config, builds);
+
     if (!noInitialBuild)
     {
         MateBundler.Execute(config, builds);
         MateImageCompressor.Execute(config, recompress: recompressMode);
     }
 
-    using MateWatcher watcher = new(config, builds);
     watcher.WaitForExit();
 }
 else if (inputPath is not null)

@@ -34,21 +34,84 @@ internal class ModernConsoleLogger
 
     // Column widths (keep consistent so table does not shift)
     private const int ProjectWidth = 30;
+    private const int NugetName = 50;
     private const int SmallColWidth = 16; // rebuild/pack/publish
     private const int StatusWidth = 30;
     private string _publishVersion = string.Empty;
 
-    public void Initialize(IEnumerable<CloudPackProject> projects)
+    public void ShowPreflight(string publishVersion, IEnumerable<PackagePreflight> packages)
+    {
+        Console.Clear();
+        DrawTitle();
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("Target version: ");
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine(publishVersion);
+        Console.ResetColor();
+        Console.WriteLine();
+
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine(FormatCell("Project", ProjectWidth) + " │ " +
+                          FormatCell("NuGet package", NugetName) + " │ " +
+                          FormatCell("Current version", StatusWidth));
+        Console.WriteLine(new string('─', ProjectWidth + NugetName + StatusWidth + 6));
+        Console.ResetColor();
+
+        foreach (PackagePreflight package in packages)
+        {
+            string currentVersion = package.LookupError is not null
+                ? "Check failed"
+                : package.CurrentVersion ?? "Not published";
+
+            Console.Write(FormatCell(package.ProjectName, ProjectWidth) + " │ ");
+            Console.Write(FormatCell(package.PackageId, NugetName) + " │ ");
+            Console.ForegroundColor = package.LookupError is not null
+                ? ConsoleColor.Yellow
+                : package.CurrentVersion is null ? ConsoleColor.Gray : ConsoleColor.Green;
+            Console.WriteLine(FormatCell(currentVersion, StatusWidth));
+            Console.ResetColor();
+
+            if (package.LookupError is not null)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"  NuGet check for {package.PackageId}: {package.LookupError}");
+                Console.ResetColor();
+            }
+        }
+
+        Console.WriteLine();
+    }
+
+    public bool ConfirmProceed()
+    {
+        Console.Write("Press Enter to proceed, or Esc to cancel: ");
+
+        while (true)
+        {
+            ConsoleKey key = Console.ReadKey(intercept: true).Key;
+            if (key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                return true;
+            }
+
+            if (key == ConsoleKey.Escape)
+            {
+                Console.WriteLine();
+                return false;
+            }
+        }
+    }
+
+    public void Initialize(IEnumerable<CloudPackProject> projects, string publishVersion)
     {
         _projects.Clear();
         _errors.Clear();
         _logLineOffset = 0;
+        _publishVersion = publishVersion;
         foreach (var project in projects)
-        {
             _projects.Add(new ProjectStatus { Name = project.Name });
-            if (string.IsNullOrEmpty(_publishVersion))
-                _publishVersion = CloudPack.GetProjectPropertyValue(project.Document, "PropertyGroup/Version") ?? string.Empty;
-        }
         
         Console.Clear();
         DrawHeader();
@@ -58,12 +121,7 @@ internal class ModernConsoleLogger
 
     private void DrawHeader()
     {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║                            CloudMate Package Manager                     ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════╝");
-        Console.ResetColor();
-        Console.WriteLine();
+        DrawTitle();
 
         if (!string.IsNullOrEmpty(_publishVersion))
         {
@@ -76,6 +134,16 @@ internal class ModernConsoleLogger
         }
 
         _headerLines = 4;
+    }
+
+    private static void DrawTitle()
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║                            CloudMate Package Manager                     ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════╝");
+        Console.ResetColor();
+        Console.WriteLine();
     }
 
     private void DrawProjectTable()
@@ -131,7 +199,7 @@ internal class ModernConsoleLogger
     private void WriteStatusWithColor(Status status, int width)
     {
         Console.ForegroundColor = GetStatusColor(status);
-        string statusText = GetStatusSymbol(status) + " " + status.ToString();
+        string statusText = status.ToString();
         Console.Write(FormatCell(statusText, width));
         Console.ResetColor();
     }
@@ -156,18 +224,6 @@ internal class ModernConsoleLogger
         Status.Skipped => ConsoleColor.DarkYellow,
         Status.Warning => ConsoleColor.Magenta,
         _ => ConsoleColor.White
-    };
-
-    private static string GetStatusSymbol(Status status) => status switch
-    {
-        Status.Pending => "[ ]",
-        Status.InProgress => "[~]",
-        Status.Success => "[+]",
-        Status.Exists => "[=]",
-        Status.Failed => "[-]",
-        Status.Skipped => "[>]",
-        Status.Warning => "[!]",
-        _ => "[?]"
     };
 
     private static Status GetOverallStatus(ProjectStatus project)
@@ -252,12 +308,6 @@ internal class ModernConsoleLogger
         if (color.HasValue) Console.ResetColor();
 
         _logLineOffset++;
-    }
-
-    public void LogHeading(string heading)
-    {
-        WriteLogLine($"\nPACK: {heading}", ConsoleColor.Cyan);
-        _logLineOffset++; // account for the \n
     }
 
     public void LogInfo(string message) => WriteLogLine($"INFO: {message}");

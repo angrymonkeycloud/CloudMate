@@ -63,6 +63,8 @@ using AngryMonkey.CloudMate;
 
 ## CloudPack
 
+Before changing any project files, CloudPack displays the target version, each resolved NuGet package ID, and its currently published version. Press **Enter** to continue or **Esc** to cancel.
+
 `CloudPack` automates the full NuGet release pipeline: syncing version and metadata across projects, rebuilding in Release mode, packing to `.nupkg`, and publishing to nuget.org — with retry logic and a styled console UI.
 
 ### Pipeline Phases
@@ -171,6 +173,7 @@ await new CloudPack(new CloudPackConfig { NugetApiKey = apiKey })
 | `NugetApiKey` | `string?` | `null` | NuGet API key for publishing |
 | `MaxRetryAttempts` | `int` | `3` | Maximum retry attempts per operation |
 | `RetryDelayMs` | `int` | `2000` | Delay between retries in milliseconds |
+| `ConfirmBeforePack` | `bool` | `true` | Show the NuGet preflight and require Enter before packaging |
 
 #### `CloudPack` Properties
 

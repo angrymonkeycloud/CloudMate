@@ -8,7 +8,8 @@ public class CloudPackProject
     {
         Name = name;
         Document = XDocument.Load(FilePath, LoadOptions.PreserveWhitespace);
-        AssemblyName = CloudPack.GetProjectPropertyValue(Document, "PropertyGroup/AssemblyName")!;
+        AssemblyName = CloudPack.GetProjectPropertyValue(Document, "PropertyGroup/AssemblyName") ?? Name;
+        PackageId = CloudPack.GetProjectPropertyValue(Document, "PropertyGroup/PackageId") ?? AssemblyName;
     }
 
     public string Name { get; init; }
@@ -18,5 +19,6 @@ public class CloudPackProject
     public bool PackAndPublish { get; init; } = true;
 
     internal string AssemblyName { get; set; }
+    internal string PackageId { get; set; }
     internal XDocument Document { get; set; }
 }

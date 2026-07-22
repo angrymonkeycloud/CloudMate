@@ -14,7 +14,7 @@ public sealed class MateWatcher : IDisposable
     private readonly List<FileSystemWatcher> _watchers = [];
     private readonly object _lock = new();
     private readonly ManualResetEventSlim _exitSignal = new(false);
-    private readonly Dictionary<string, DateTime> _lastRunUtc = [];
+    private readonly Dictionary<string, Timer> _pendingBuildTimers = [];
     private readonly ConcurrentQueue<BuildRequest> _pendingBuilds = new();
     private readonly Timer _idleReleaseTimer;
     private readonly Timer _configReloadTimer;
@@ -25,6 +25,13 @@ public sealed class MateWatcher : IDisposable
 
     /// <summary>Idle time after the last compile before compiler engines are released to reclaim memory.</summary>
     private static readonly TimeSpan IdleReleaseDelay = TimeSpan.FromSeconds(90);
+
+    /// <summary>
+    /// FileSystemWatcher commonly raises several notifications for one save. Waiting for a short
+    /// quiet period ensures editors and AI agents have finished atomic/streamed writes before the
+    /// compiler reads the source, while still rebuilding promptly.
+    /// </summary>
+    private static readonly TimeSpan FileChangeSettleDelay = TimeSpan.FromMilliseconds(200);
 
     /// <summary>Generated and tool-managed directories which are never valid source inputs.</summary>
     private static readonly string[] ExcludedPathSegments =
@@ -234,21 +241,42 @@ public sealed class MateWatcher : IDisposable
 
     private void QueueFile(MateConfigFile file, string buildName)
     {
+        string key = $"{string.Join("|", file.Input)}::{buildName}";
+        MateConfig? capturedConfig = null;
+        Timer? timer = null;
+
         lock (_lock)
         {
             if (_disposed)
                 return;
 
-            string key = $"{string.Join("|", file.Input)}::{buildName}";
-            DateTime now = DateTime.UtcNow;
-            if (_lastRunUtc.TryGetValue(key, out DateTime last) && (now - last).TotalMilliseconds < 250)
-                return;
+            capturedConfig = _config;
 
-            _lastRunUtc[key] = now;
-            _pendingBuilds.Enqueue(new BuildRequest(_config, file, buildName));
+            if (_pendingBuildTimers.Remove(key, out Timer? previousTimer))
+                previousTimer.Dispose();
+
+            timer = new Timer(_ =>
+            {
+                bool buildQueued = false;
+                lock (_lock)
+                {
+                    if (!_disposed
+                        && _pendingBuildTimers.TryGetValue(key, out Timer? currentTimer)
+                        && ReferenceEquals(currentTimer, timer))
+                    {
+                        _pendingBuildTimers.Remove(key);
+                        _pendingBuilds.Enqueue(new BuildRequest(capturedConfig!, file, buildName));
+                        buildQueued = true;
+                    }
+                }
+
+                timer?.Dispose();
+                if (buildQueued)
+                    StartBuildWorker();
+            }, null, FileChangeSettleDelay, Timeout.InfiniteTimeSpan);
+
+            _pendingBuildTimers[key] = timer;
         }
-
-        StartBuildWorker();
     }
 
     private void StartBuildWorker()
@@ -355,8 +383,8 @@ public sealed class MateWatcher : IDisposable
                     return;
 
                 DisposeWatchersLocked();
+                DisposePendingBuildTimersLocked();
                 _config = nextConfig;
-                _lastRunUtc.Clear();
                 AttachWatchers();
             }
 
@@ -430,7 +458,11 @@ public sealed class MateWatcher : IDisposable
                 InternalBufferSize = 64 * 1024
             };
 
-            watcher.Error += (_, e) => LogError($"Watcher error in '{fullDirectory}': {e.GetException().Message}. Run 'mate' once to resynchronize if changes were missed.");
+            watcher.Error += (_, e) =>
+            {
+                LogError($"Watcher error in '{fullDirectory}': {e.GetException().Message}. Rebuilding configured files to resynchronize.");
+                QueueConfiguredFiles(_config);
+            };
             AttachHandler(watcher, handler, watcherType);
 
             _watchers.Add(watcher);
@@ -455,6 +487,7 @@ public sealed class MateWatcher : IDisposable
 
             _disposed = true;
             DisposeWatchersLocked();
+            DisposePendingBuildTimersLocked();
         }
 
         try { _configReloadTimer.Dispose(); }
@@ -472,6 +505,14 @@ public sealed class MateWatcher : IDisposable
         }
 
         _watchers.Clear();
+    }
+
+    private void DisposePendingBuildTimersLocked()
+    {
+        foreach (Timer timer in _pendingBuildTimers.Values)
+            timer.Dispose();
+
+        _pendingBuildTimers.Clear();
     }
 
     /// <summary>Blocks the calling thread until Ctrl+C is pressed or <see cref="Stop"/> is called.</summary>
