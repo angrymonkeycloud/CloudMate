@@ -105,7 +105,7 @@ public sealed class CloudMatePackage : AsyncPackage
     }
 
     /// <summary>
-    /// Starts always-on watch once package loads, using the first discovered .mateconfig.json
+    /// Starts always-on watch once package loads, using the first discovered mateconfig.json
     /// under the open solution. Watch self-heals in MateRunner if the process exits.
     /// </summary>
     private void BootstrapAlwaysOnWatch()

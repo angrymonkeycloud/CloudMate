@@ -6,7 +6,7 @@ public class MateConfigTests
     public void Get_LoadsPerFileMinifyOverride()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", """
+        dir.WriteFile("mateconfig.json", """
             {
               "files": [
                 { "input": "Component.razor.less", "output": "Component.razor.css", "minify": false }
@@ -40,7 +40,7 @@ public class MateConfigTests
     public void FindConfigurationFile_FindsMateConfigJsonInWorkingDirectory()
     {
         using TempDirectory dir = new();
-        string configPath = dir.WriteFile(".mateconfig.json", "{}");
+        string configPath = dir.WriteFile("mateconfig.json", "{}");
 
         string found = MateConfig.FindConfigurationFile(dir.Path);
 
@@ -51,7 +51,7 @@ public class MateConfigTests
     public void FindConfigurationFile_WalksUpParentDirectories()
     {
         using TempDirectory dir = new();
-        string configPath = dir.WriteFile(".mateconfig.json", "{}");
+        string configPath = dir.WriteFile("mateconfig.json", "{}");
         string nested = dir.Combine("a/b/c");
         Directory.CreateDirectory(nested);
 
@@ -61,23 +61,11 @@ public class MateConfigTests
     }
 
     [Fact]
-    public void FindConfigurationFile_PrefersDotMateConfigOverJsonVariant()
-    {
-        using TempDirectory dir = new();
-        string preferred = dir.WriteFile(".mateconfig", "{}");
-        dir.WriteFile(".mateconfig.json", "{}");
-
-        string found = MateConfig.FindConfigurationFile(dir.Path);
-
-        Assert.Equal(preferred, found);
-    }
-
-    [Fact]
-    public void FindConfigurationFile_PrefersCanonicalDotConfigOverDeprecatedUnprefixedConfig()
+    public void FindConfigurationFile_PrefersDotJsonVariantOverBareDotMateConfig()
     {
         using TempDirectory dir = new();
         string preferred = dir.WriteFile(".mateconfig.json", "{}");
-        dir.WriteFile("mateconfig.json", "{}");
+        dir.WriteFile(".mateconfig", "{}");
 
         string found = MateConfig.FindConfigurationFile(dir.Path);
 
@@ -85,14 +73,28 @@ public class MateConfigTests
     }
 
     [Fact]
-    public void FindConfigurationFile_SupportsDeprecatedMateConfigJsonWithoutLeadingDot()
+    public void FindConfigurationFile_PrefersMateConfigJsonOverDotVariants()
     {
         using TempDirectory dir = new();
-        string configPath = dir.WriteFile("mateconfig.json", "{}");
+        string preferred = dir.WriteFile("mateconfig.json", "{}");
+        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile(".mateconfig", "{}");
 
         string found = MateConfig.FindConfigurationFile(dir.Path);
 
-        Assert.Equal(configPath, found);
+        Assert.Equal(preferred, found);
+    }
+
+    [Fact]
+    public void FindConfigurationFile_PrefersCanonicalMateConfigJsonOverDeprecatedDotConfig()
+    {
+        using TempDirectory dir = new();
+        string preferred = dir.WriteFile("mateconfig.json", "{}");
+        dir.WriteFile(".mateconfig", "{}");
+
+        string found = MateConfig.FindConfigurationFile(dir.Path);
+
+        Assert.Equal(preferred, found);
     }
 
     [Fact]
@@ -137,7 +139,7 @@ public class MateConfigTests
     public void Get_ParsesJsonConfigurationAndAppliesDevBuildDefault()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", """
+        dir.WriteFile("mateconfig.json", """
         {
             "files": [
                 { "input": "src/app.ts", "output": "dist/app.js" }
@@ -158,7 +160,7 @@ public class MateConfigTests
     public void Get_SupportsStringOrArrayForInputAndOutput()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", """
+        dir.WriteFile("mateconfig.json", """
         {
             "files": [
                 { "input": ["a.ts", "b.ts"], "output": "dist/app.js" }
@@ -213,7 +215,7 @@ public class MateConfigTests
     {
         using TempDirectory dir = new();
         string tsConfigPath = dir.WriteFile("tsconfig.json", "{}");
-        dir.WriteFile(".mateconfig.json", """
+        dir.WriteFile("mateconfig.json", """
         {
             "builds": [ { "name": "dist" } ],
             "files": []
@@ -230,7 +232,7 @@ public class MateConfigTests
     public void GetBuild_ReturnsDevBuildForNullOrEmptyName()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
 
         MateConfig config = MateConfig.Get(dir.Path);
 
@@ -242,7 +244,7 @@ public class MateConfigTests
     public void GetBuild_ReturnsNullForUndefinedBuild()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
 
         MateConfig config = MateConfig.Get(dir.Path);
 
@@ -253,7 +255,7 @@ public class MateConfigTests
     public void RootDirectory_MatchesConfigurationFileDirectory()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
 
         MateConfig config = MateConfig.Get(dir.Path);
 

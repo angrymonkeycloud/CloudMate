@@ -16,7 +16,7 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 /// </summary>
 internal static class ConfigWriter
 {
-    internal const string ConfigFileName = ".mateconfig.json";
+    internal const string ConfigFileName = "mateconfig.json";
     internal static readonly string[] ConfigFileNames = [".mateconfig", ".mateconfig.json", "mateconfig.json"];
 
     private static readonly JsonSerializerOptions WriteOptions = new()
@@ -315,7 +315,7 @@ internal static class ConfigWriter
     };
 
     /// <summary>
-    /// Adds a compile entry for <paramref name="sourceFile"/> to the project's <c>.mateconfig.json</c>.
+    /// Adds a compile entry for <paramref name="sourceFile"/> to the project's <c>mateconfig.json</c>.
     /// Known source types are mapped to their output extension (.less/.scss/.sass → .css, .ts → .js).
     /// All other file types use the same extension as output and are placed under wwwroot when it exists.
     /// Minified variants for CSS/JS are produced automatically by the bundler.
@@ -370,7 +370,7 @@ internal static class ConfigWriter
 
     /// <summary>
     /// Returns whether <paramref name="sourceFile"/> already exists in <c>files</c> input entries
-    /// of the project's <c>.mateconfig.json</c>.
+    /// of the project's <c>mateconfig.json</c>.
     /// </summary>
     public static bool HasCompileFile(string projectRoot, string sourceFile)
     {
@@ -450,7 +450,7 @@ internal static class ConfigWriter
 
     /// <summary>
     /// Adds an image-compression entry for the folder <paramref name="sourceFolder"/> to the project's
-    /// <c>.mateconfig.json</c>. The input is a recursive glob under the folder and the output is the
+    /// <c>mateconfig.json</c>. The input is a recursive glob under the folder and the output is the
     /// folder placed under <c>wwwroot</c> with the same relative path (leading <c>src</c>/<c>source</c>
     /// stripped) when a wwwroot exists; otherwise the folder is kept as-is.
     /// </summary>
@@ -481,7 +481,7 @@ internal static class ConfigWriter
 
     /// <summary>
     /// Returns whether <paramref name="sourceFolder"/> already exists in <c>images</c> input entries
-    /// of the project's <c>.mateconfig.json</c>.
+    /// of the project's <c>mateconfig.json</c>.
     /// </summary>
     public static bool HasCompressFolder(string projectRoot, string sourceFolder)
     {

@@ -6,7 +6,7 @@ public class MateBundlerTests
     public void Execute_PassthroughCss_ConcatenatesInputFilesInOrder()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("a.css", ".a { color: red; }");
         dir.WriteFile("b.css", ".b { color: blue; }");
 
@@ -36,7 +36,7 @@ public class MateBundlerTests
     public void Execute_JsBuildWithMinifyEnabled_WritesMinifiedSiblingFile()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.js", "function add(a, b) {\n    return a + b;\n}\n");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -61,7 +61,7 @@ public class MateBundlerTests
     public void ExecuteInput_BuildsOnlyTheSelectedConfigEntry()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("first.less", ".first { color: red; }");
         dir.WriteFile("second.less", ".second { color: blue; }");
 
@@ -91,7 +91,7 @@ public class MateBundlerTests
     public void Execute_MissingJsInput_DoesNotStopOtherEntries()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("working.js", "window.cloudMateStillRuns = true;");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -132,7 +132,7 @@ public class MateBundlerTests
     public void Execute_DeletedOnlyInput_RemovesStaleOutputs()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("dist/deleted.js", "stale output");
         dir.WriteFile("dist/deleted.min.js", "stale minified output");
 
@@ -154,7 +154,7 @@ public class MateBundlerTests
     public void Execute_CompilesTypeScriptInput_EmitsJavaScriptAndDeclaration()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.ts", "export const value: number = 42;\n");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -180,7 +180,7 @@ public class MateBundlerTests
     public void Execute_CompilesLessInput_EmitsCss()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.less", "@color: red;\n.foo { color: @color; }\n");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -206,7 +206,7 @@ public class MateBundlerTests
     public void Execute_PerFileMinifyFalse_WritesCssOnlyAndRemovesStaleMinifiedOutput()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("Component.razor.less", ".component { color: red; }");
         dir.WriteFile("Component.razor.min.css", "stale");
 
@@ -230,7 +230,7 @@ public class MateBundlerTests
     public void Execute_PerFileMinifyTrue_OverridesDisabledBuildMinification()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("site.less", ".site { color: blue; }");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -253,7 +253,7 @@ public class MateBundlerTests
     public void Execute_CompilesScssInput_EmitsCss()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.scss", "$color: red;\n.foo { color: $color; }\n");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -278,7 +278,7 @@ public class MateBundlerTests
     public void RunFiles_UnknownBuildName_SkipsOutputAndLogsError()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.js", "console.log(1);");
 
         MateConfig config = MateConfig.Get(dir.Path);
@@ -310,7 +310,7 @@ public class MateBundlerTests
     public void RunOutput_WithOutDirVersioningAndOutDirName_WritesToVersionedNamedDirectory()
     {
         using TempDirectory dir = new();
-        dir.WriteFile(".mateconfig.json", "{}");
+        dir.WriteFile("mateconfig.json", "{}");
         dir.WriteFile("app.css", ".a { color: red; }");
 
         MateConfig config = MateConfig.Get(dir.Path);

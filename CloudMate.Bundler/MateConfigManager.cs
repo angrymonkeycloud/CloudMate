@@ -15,7 +15,7 @@ public static class MateConfigManager
     /// <summary>Error output sink.</summary>
     public static Action<string> LogError { get; set; } = Console.Error.WriteLine;
 
-    private const string ConfigFileName = ".mateconfig.json";
+    private const string ConfigFileName = "mateconfig.json";
 
     // ─── Result records ──────────────────────────────────────────────────────────
 

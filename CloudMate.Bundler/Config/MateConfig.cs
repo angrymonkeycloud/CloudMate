@@ -12,11 +12,11 @@ public class MateConfig
 {
     private static readonly string[] SearchPlaces =
     [
-        ".mateconfig",
+        "mateconfig.json",
         ".mateconfig.json",
+        ".mateconfig",
         ".mateconfig.yaml",
         ".mateconfig.yml",
-        "mateconfig.json",
         "mateconfig.yaml",
         "mateconfig.yml",
         "package.json"
@@ -69,7 +69,7 @@ public class MateConfig
             }
 
         if (File.Exists(Path.Combine(startDirectory, ".mateconfig.js")))
-            throw new FileNotFoundException(".mateconfig.js is not supported by the .NET version of CloudMate. Please convert it to .mateconfig.json.");
+            throw new FileNotFoundException(".mateconfig.js is not supported by the .NET version of CloudMate. Please convert it to mateconfig.json.");
 
         throw new FileNotFoundException("Configuration file was not found.");
     }

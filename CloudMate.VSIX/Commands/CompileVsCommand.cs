@@ -8,7 +8,7 @@ using Microsoft.VisualStudio.Shell;
 namespace AngryMonkey.CloudMate.VisualStudio.Commands;
 
 /// <summary>
-/// Adds the selected file to .mateconfig.json as a compile entry.
+/// Adds the selected file to mateconfig.json as a compile entry.
 /// Visible only for CompileFile selections (non-image, non-config files).
 /// Text is "Compile" when not yet configured, "Recompile" when already in config.
 /// </summary>
