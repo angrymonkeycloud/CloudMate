@@ -288,10 +288,14 @@ public class MateBundler
                 {
                     try
                     {
-                        pieces.Add(LessCompiler.Compile(file, build.Css.SourceMap));
+                        pieces.Add(LessCompiler.Compile(file, build.Css.SourceMap, out IReadOnlyCollection<string> imports));
+                        StyleDependencies.Record(file, imports);
                     }
                     catch (Exception exception)
                     {
+                        // Imports are unknown after a failed compile; drop the graph so a watch session
+                        // keeps rebuilding this entry on any style change until it compiles again.
+                        StyleDependencies.Forget(file);
                         LogError($"{file}: {exception.Message}");
                     }
                 }
@@ -304,10 +308,12 @@ public class MateBundler
                 {
                     try
                     {
-                        pieces.Add(SassCompiler.Compile(file, build.Css.SourceMap));
+                        pieces.Add(SassCompiler.Compile(file, build.Css.SourceMap, out IReadOnlyCollection<string> imports));
+                        StyleDependencies.Record(file, imports);
                     }
                     catch (Exception exception)
                     {
+                        StyleDependencies.Forget(file);
                         LogError($"{file}: {exception.Message}");
                     }
                 }

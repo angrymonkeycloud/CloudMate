@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AngryMonkey.CloudMate;
 
 // ─── Console setup ────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ MateConfigManager.LogError = msg => Print(msg, ConsoleColor.Red);
 // ─── Argument parsing (mirrors legacy minimist behavior) ─────────────────────
 
 List<string> positional = [];
+List<string> watchRoots = [];
 bool watchMode = false;
 bool allBuilds = false;
 bool showHelp = false;
@@ -28,6 +30,7 @@ bool autoConfigMode = false;
 bool recompressMode = false;
 bool noInitialBuild = false;
 string? inputPath = null;
+int parentProcessId = 0;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -43,6 +46,12 @@ for (int i = 0; i < args.Length; i++)
         case "--no-initial-build":      noInitialBuild = true; break;
         case "--input" when i + 1 < args.Length:
             inputPath = args[++i];
+            break;
+        case "--root" when i + 1 < args.Length:
+            watchRoots.Add(args[++i]);
+            break;
+        case "--parent-pid" when i + 1 < args.Length:
+            _ = int.TryParse(args[++i], out parentProcessId);
             break;
         default:
             if (!args[i].StartsWith('-'))
@@ -77,6 +86,8 @@ if (showHelp)
     Console.WriteLine("      --autoconfig   clean config and add all unconfigured .ts/.less/.scss/.sass files");
     Console.WriteLine("      --recompress   force re-compress all images even if output files already exist");
     Console.WriteLine("      --input FILE   compile only config entries containing FILE");
+    Console.WriteLine("      --root DIR     with --watch: watch this project directory (repeatable)");
+    Console.WriteLine("      --parent-pid N with --watch: exit when process N exits");
     Console.WriteLine("  -h, --help         print this help");
     Console.WriteLine("  -v, --version      print CloudMate version");
     return 0;
@@ -127,6 +138,107 @@ if (autoConfigMode)
     return 0;
 }
 
+// Resolve build list: null means "all" (legacy --all semantics)
+IReadOnlyList<string>? builds = allBuilds ? null : (positional.Count > 0 ? positional : null);
+
+// ─── --watch ──────────────────────────────────────────────────────────────────
+
+if (watchMode)
+{
+    if (watchRoots.Count == 0)
+        watchRoots.Add(Directory.GetCurrentDirectory());
+
+    // One process serves every requested project: the compiler engines (the bulk of the memory)
+    // are shared, and a broken configuration in one project never stops the others.
+    List<MateConfig> watchConfigs = [];
+    HashSet<string> loadedConfigFiles = new(StringComparer.OrdinalIgnoreCase);
+
+    foreach (string root in watchRoots)
+    {
+        try
+        {
+            MateConfig rootConfig = MateConfig.Get(root);
+
+            // Roots that resolve to the same configuration file (a project and its parent, or the
+            // same directory passed twice) must produce only one watch session.
+            if (loadedConfigFiles.Add(Path.GetFullPath(rootConfig.ConfigFilePath)))
+                watchConfigs.Add(rootConfig);
+        }
+        catch (Exception ex)
+        {
+            MateWatcher.LogError($"Cannot watch '{root}': {ex.Message}");
+        }
+    }
+
+    if (watchConfigs.Count == 0)
+    {
+        Print("Error: no watchable configuration file was found.", ConsoleColor.Red);
+        return 1;
+    }
+
+    using ManualResetEventSlim exitSignal = new(false);
+
+    // Arm filesystem notifications before the initial build. A file saved while a large project
+    // is being compiled will then be queued again instead of falling into a startup race window.
+    List<MateWatcher> watchers = [];
+    int runningWatchers = watchConfigs.Count;
+
+    foreach (MateConfig watchConfig in watchConfigs)
+    {
+        MateWatcher watcher = new(watchConfig, builds);
+        watcher.Stopped += _ =>
+        {
+            if (Interlocked.Decrement(ref runningWatchers) <= 0)
+                exitSignal.Set();
+        };
+
+        watchers.Add(watcher);
+        MateWatcher.Log($"Watching {watcher.RootDirectory}");
+    }
+
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; exitSignal.Set(); };
+
+    // Editors host this process; when the editor is gone the watch has nothing left to serve and
+    // must not survive as an orphan holding compiler memory.
+    Process? parentProcess = null;
+
+    if (parentProcessId > 0)
+    {
+        try
+        {
+            parentProcess = Process.GetProcessById(parentProcessId);
+            parentProcess.EnableRaisingEvents = true;
+            parentProcess.Exited += (_, _) => exitSignal.Set();
+
+            if (parentProcess.HasExited)
+                exitSignal.Set();
+        }
+        catch (ArgumentException)
+        {
+            // The parent is already gone.
+            exitSignal.Set();
+        }
+    }
+
+    // The initial build reconciles sources changed while nothing was watching them.
+    if (!noInitialBuild && !exitSignal.IsSet)
+        foreach (MateConfig watchConfig in watchConfigs)
+        {
+            MateBundler.Execute(watchConfig, builds);
+            MateImageCompressor.Execute(watchConfig, recompress: recompressMode);
+        }
+
+    exitSignal.Wait();
+
+    parentProcess?.Dispose();
+
+    foreach (MateWatcher watcher in watchers)
+        watcher.Dispose();
+
+    MateWatcher.Log("Watch stopped.");
+    return 0;
+}
+
 // ─── Load config ──────────────────────────────────────────────────────────────
 
 MateConfig config;
@@ -141,26 +253,9 @@ catch (FileNotFoundException ex)
     return 1;
 }
 
-// Resolve build list: null means "all" (legacy --all semantics)
-IReadOnlyList<string>? builds = allBuilds ? null : (positional.Count > 0 ? positional : null);
-
 // ─── Execute ──────────────────────────────────────────────────────────────────
 
-if (watchMode)
-{
-    // Arm filesystem notifications before the initial build. A file saved while a large project
-    // is being compiled will then be queued again instead of falling into a startup race window.
-    using MateWatcher watcher = new(config, builds);
-
-    if (!noInitialBuild)
-    {
-        MateBundler.Execute(config, builds);
-        MateImageCompressor.Execute(config, recompress: recompressMode);
-    }
-
-    watcher.WaitForExit();
-}
-else if (inputPath is not null)
+if (inputPath is not null)
 {
     if (MateBundler.ExecuteInput(config, inputPath, builds) == 0)
     {

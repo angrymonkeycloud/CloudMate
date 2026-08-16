@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Management;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,16 +11,24 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 
 /// <summary>
 /// Shared helper: runs the .NET CloudMate CLI bundled with the extension.
+/// A single watch process serves every configured project in the solution — the compiler engines are
+/// the bulk of its memory, so hosting all projects in one process keeps the extension light — and it
+/// is bound to the lifetime of this Visual Studio instance so it can never survive as an orphan.
 /// </summary>
 internal static class MateRunner
 {
     private static Process? _watchProcess;
-    private static string? _watchWorkingDirectory;
+    private static string[] _watchRoots = new string[0];
     private static Action<string>? _watchOutput;
     private static Action<string>? _watchError;
     private static bool _watchStopRequested;
     private static readonly object _watchLock = new();
     private static readonly SemaphoreSlim _runGate = new(1, 1);
+
+    /// <summary>Unexpected exits allowed inside <see cref="RestartWindow"/> before watch gives up.</summary>
+    private const int MaxRestartsPerWindow = 4;
+    private static readonly TimeSpan RestartWindow = TimeSpan.FromMinutes(2);
+    private static readonly List<DateTime> _restartTimes = new();
 
     public static bool IsWatching
     {
@@ -29,41 +39,72 @@ internal static class MateRunner
         }
     }
 
+    /// <summary>The project directories the current watch process covers.</summary>
+    public static IReadOnlyList<string> WatchRoots
+    {
+        get
+        {
+            lock (_watchLock)
+                return (string[])_watchRoots.Clone();
+        }
+    }
+
     /// <summary>
-    /// Ensures a resilient watch process is running for the supplied working directory.
-    /// If watch exits unexpectedly it is restarted automatically.
+    /// Ensures one watch process is running for exactly <paramref name="roots"/>. Restarts it only when
+    /// the set of projects actually changed, so re-synchronizing on solution events is free.
     /// </summary>
-    public static void EnsureWatch(string workingDirectory, Action<string> output, Action<string> error)
+    public static void EnsureWatch(IEnumerable<string> roots, Action<string> output, Action<string> error)
     {
         string? logAfterLock = null;
-        Action<string>? logCallback = null;
+        string? errorAfterLock = null;
 
         lock (_watchLock)
         {
-            _watchWorkingDirectory = workingDirectory;
+            string[] requested = Normalize(roots);
+
             _watchOutput = output;
             _watchError = error;
 
-            if (_watchProcess is { HasExited: false }
-                && string.Equals(_watchProcess.StartInfo.WorkingDirectory, workingDirectory, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            if (_watchProcess is { HasExited: false })
+            if (requested.Length == 0)
             {
-                _watchStopRequested = true;
-                KillProcessTree(_watchProcess);
-                _watchProcess.Dispose();
-                _watchProcess = null;
-            }
+                errorAfterLock = _watchProcess is { HasExited: false }
+                    ? "[CloudMate] no mateconfig.json remains in this solution; stopping watch."
+                    : null;
 
-            _watchStopRequested = false;
-            logAfterLock = StartWatchInternal();
-            logCallback = output;
+                StopWatchLocked();
+            }
+            else if (_watchProcess is { HasExited: false } && requested.SequenceEqual(_watchRoots, StringComparer.OrdinalIgnoreCase))
+            {
+                // Already watching exactly these projects.
+            }
+            else
+            {
+                StopWatchLocked();
+                _watchStopRequested = false;
+                _watchRoots = requested;
+                _restartTimes.Clear();
+                logAfterLock = StartWatchLocked();
+            }
         }
 
-        // Emit log AFTER the lock is released so OutputLine never blocks while the lock is held.
-        if (logAfterLock is not null)
-            logCallback?.Invoke(logAfterLock);
+        // Emit logs AFTER the lock is released so output never blocks while the lock is held.
+        if (errorAfterLock is not null) error(errorAfterLock);
+        if (logAfterLock is not null) output(logAfterLock);
+    }
+
+    /// <summary>
+    /// Adds <paramref name="root"/> to the watched projects, keeping the ones already covered.
+    /// Used by the context-menu commands so compiling one file never stops watching another project.
+    /// </summary>
+    public static void EnsureWatchIncludes(string root, Action<string> output, Action<string> error)
+    {
+        List<string> roots;
+
+        lock (_watchLock)
+            roots = new List<string>(_watchRoots);
+
+        roots.Add(root);
+        EnsureWatch(roots, output, error);
     }
 
     /// <summary>Runs <c>mate [args]</c> in <paramref name="workingDirectory"/> and streams output to <paramref name="output"/>.</summary>
@@ -100,129 +141,241 @@ internal static class MateRunner
         }
     }
 
-    /// <summary>Starts <c>mate --watch</c> in the background. Kept for backward compatibility; delegates to EnsureWatch.</summary>
-    public static void StartWatch(string workingDirectory, Action<string> output, Action<string> error)
-        => EnsureWatch(workingDirectory, output, error);
-
     // Returns a log line to emit AFTER the lock is released, or null.
-    private static string? StartWatchInternal()
+    private static string? StartWatchLocked()
     {
-        if (string.IsNullOrEmpty(_watchWorkingDirectory) || _watchOutput is null || _watchError is null)
+        if (_watchRoots.Length == 0 || _watchOutput is null || _watchError is null)
             return null;
 
-        string watchDirectory = _watchWorkingDirectory!;
-        string exe = FindMate();
+        Action<string> output = _watchOutput;
+        Action<string> error = _watchError;
+
+        // The watch process exits by itself when this Visual Studio instance is gone, even if VS is
+        // killed without ever unloading the extension.
+        List<string> args = new() { "--watch", "--parent-pid", Process.GetCurrentProcess().Id.ToString() };
+        foreach (string root in _watchRoots)
+        {
+            args.Add("--root");
+            args.Add(root);
+        }
+
         // Always run the initial build. It reconciles source changes made before Visual Studio
-        // opened the project or while the extension/watch process was still starting.
-        ProcessStartInfo psi = CreateStartInfo(exe, new[] { "--watch" }, watchDirectory);
+        // opened the solution or while the extension was still starting.
+        ProcessStartInfo psi = CreateStartInfo(FindMate(), args.ToArray(), _watchRoots[0]);
 
         Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
-        proc.OutputDataReceived += (_, e) => { if (e.Data is not null) _watchOutput(e.Data); };
-        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) _watchError(e.Data); };
-        proc.Exited += (_, _) => OnWatchExited();
+        proc.OutputDataReceived += (_, e) => { if (e.Data is not null) output(e.Data); };
+        proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) error(e.Data); };
+        // The exiting process is passed along so an exit notification that arrives after the process
+        // was already replaced cannot tear down its replacement.
+        proc.Exited += (_, _) => OnWatchExited(proc);
 
         proc.Start();
         proc.BeginOutputReadLine();
         proc.BeginErrorReadLine();
 
+        try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; }
+        catch { /* the process may already be gone; priority is only a nicety */ }
+
         _watchProcess = proc;
-        // Return the message; caller must emit it AFTER releasing _watchLock.
-        return $"[CloudMate] bundled .NET watch started in '{_watchWorkingDirectory}'.";
+
+        string projects = string.Join(", ", _watchRoots.Select(root => Path.GetFileName(root.TrimEnd('\\', '/'))));
+        return $"[CloudMate] watching {_watchRoots.Length} project{(_watchRoots.Length == 1 ? "" : "s")}: {projects}";
     }
 
-    private static void OnWatchExited()
+    private static void OnWatchExited(Process exited)
     {
         string? logAfterLock = null;
         string? errorAfterLock = null;
-        Action<string>? logOutput = null;
-        Action<string>? logError = null;
-        string? retryErrorAfterLock = null;
+        Action<string>? output = null;
+        Action<string>? error = null;
 
         lock (_watchLock)
         {
-            _watchProcess?.Dispose();
+            if (!ReferenceEquals(_watchProcess, exited))
+                return;
+
+            _watchProcess.Dispose();
             _watchProcess = null;
 
             if (_watchStopRequested)
                 return;
 
-            string? workingDirectory = _watchWorkingDirectory;
-            if (workingDirectory is null || workingDirectory.Length == 0 || _watchOutput is null || _watchError is null)
+            output = _watchOutput;
+            error = _watchError;
+
+            if (output is null || error is null)
                 return;
 
-            // Don't restart if the config file was deleted while the watch was running.
-            if (ConfigWriter.GetConfigPath(workingDirectory) is null)
+            // Drop the projects whose configuration disappeared while watch was running.
+            _watchRoots = _watchRoots.Where(root => ConfigWriter.GetConfigPath(root) is not null).ToArray();
+
+            if (_watchRoots.Length == 0)
             {
-                logError = _watchError;
-                errorAfterLock = "[CloudMate] mateconfig.json not found. watch will not restart.";
-                // Leave _watchStopRequested false so EnsureWatch can re-arm if config is recreated.
+                errorAfterLock = "[CloudMate] mateconfig.json not found; watch will not restart.";
+            }
+            else if (!TryRegisterRestartLocked())
+            {
+                // A process that keeps dying restarts forever otherwise, spawning one process per crash.
+                _watchStopRequested = true;
+                errorAfterLock = "[CloudMate] watch keeps exiting; it is now disabled for this session. "
+                    + "Check the messages above, then reload the solution to try again.";
             }
             else
             {
-                logOutput = _watchOutput;
-                logError = _watchError;
-                errorAfterLock = "[CloudMate] watch exited unexpectedly. restarting...";
+                errorAfterLock = "[CloudMate] watch exited unexpectedly; restarting...";
 
                 try
                 {
-                    logAfterLock = StartWatchInternal();
+                    logAfterLock = StartWatchLocked();
                 }
                 catch (Exception ex)
                 {
-                    retryErrorAfterLock = $"[CloudMate] watch restart failed: {ex.Message}";
+                    errorAfterLock += $" restart failed: {ex.Message}";
                 }
             }
         }
 
         // Emit all log lines AFTER the lock is released.
-        if (errorAfterLock is not null) logError?.Invoke(errorAfterLock);
-        if (logAfterLock is not null) logOutput?.Invoke(logAfterLock);
+        if (errorAfterLock is not null) error?.Invoke(errorAfterLock);
+        if (logAfterLock is not null) output?.Invoke(logAfterLock);
+    }
 
-        if (retryErrorAfterLock is not null)
-        {
-            logError?.Invoke(retryErrorAfterLock);
+    private static bool TryRegisterRestartLocked()
+    {
+        DateTime now = DateTime.UtcNow;
+        _restartTimes.RemoveAll(time => now - time > RestartWindow);
 
-            // Retry quickly; this keeps watch self-healing and near-instant on transient failures.
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(500);
-                string? retryLog = null;
-                string? retryErr = null;
-                Action<string>? retryOutput = null;
-                Action<string>? retryError = null;
+        if (_restartTimes.Count >= MaxRestartsPerWindow)
+            return false;
 
-                lock (_watchLock)
-                {
-                    if (!_watchStopRequested && _watchProcess is null)
-                    {
-                        retryOutput = _watchOutput;
-                        retryError = _watchError;
-                        try { retryLog = StartWatchInternal(); }
-                        catch (Exception retryEx) { retryErr = $"[CloudMate] watch restart failed again: {retryEx.Message}"; }
-                    }
-                }
-
-                if (retryLog is not null) retryOutput?.Invoke(retryLog);
-                if (retryErr is not null) retryError?.Invoke(retryErr);
-            });
-        }
+        _restartTimes.Add(now);
+        return true;
     }
 
     /// <summary>Terminates the running watch process, if any.</summary>
     public static void StopWatch()
     {
         lock (_watchLock)
+            StopWatchLocked();
+    }
+
+    private static void StopWatchLocked()
+    {
+        _watchStopRequested = true;
+        _watchRoots = new string[0];
+
+        // Detach before killing: the exit notification then sees it is no longer the current process
+        // and leaves whatever starts next alone.
+        Process? process = _watchProcess;
+        _watchProcess = null;
+
+        if (process is null)
+            return;
+
+        KillProcessTree(process);
+        process.Dispose();
+    }
+
+    private static string[] Normalize(IEnumerable<string> roots)
+    {
+        List<string> normalized = new();
+
+        foreach (string root in roots)
         {
-            _watchStopRequested = true;
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
 
-            if (_watchProcess is not null)
-            {
-                KillProcessTree(_watchProcess);
-                _watchProcess.Dispose();
-                _watchProcess = null;
-            }
+            string full;
+            try { full = Path.GetFullPath(root).TrimEnd('\\', '/'); }
+            catch { continue; }
 
+            if (!normalized.Contains(full, StringComparer.OrdinalIgnoreCase))
+                normalized.Add(full);
         }
+
+        // A stable order makes the "already watching these projects" comparison reliable.
+        normalized.Sort(StringComparer.OrdinalIgnoreCase);
+        return normalized.ToArray();
+    }
+
+    /// <summary>
+    /// Terminates watch processes left behind by Visual Studio instances that are no longer running.
+    /// Extension versions before parent-process binding could leak one process per session, each
+    /// holding tens of megabytes and compiling the same outputs.
+    /// </summary>
+    public static void KillOrphanedWatchProcesses(Action<string> log)
+    {
+        int killed = 0;
+        int currentProcessId = Process.GetCurrentProcess().Id;
+
+        try
+        {
+            using ManagementObjectSearcher searcher = new(
+                "SELECT ProcessId, ParentProcessId, CommandLine FROM Win32_Process WHERE Name = 'dotnet.exe'");
+            using ManagementObjectCollection processes = searcher.Get();
+
+            foreach (ManagementBaseObject process in processes)
+            {
+                using ManagementBaseObject scoped = process;
+
+                string commandLine = scoped["CommandLine"] as string ?? string.Empty;
+
+                // Only ever touch watch processes started by a CloudMate VSIX installation, never a
+                // 'mate --watch' the user runs themselves.
+                if (commandLine.IndexOf("--watch", StringComparison.OrdinalIgnoreCase) < 0
+                    || commandLine.IndexOf(@"\Tools\mate.dll", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                int processId = ToInt(scoped["ProcessId"]);
+                int parentProcessId = ToInt(scoped["ParentProcessId"]);
+
+                if (processId <= 0 || processId == currentProcessId || IsLiveVisualStudio(parentProcessId))
+                    continue;
+
+                try
+                {
+                    using Process orphan = Process.GetProcessById(processId);
+                    KillProcessTree(orphan);
+                    killed++;
+                }
+                catch (ArgumentException) { /* exited between enumeration and kill */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            log($"[CloudMate] could not check for orphaned watch processes: {ex.Message}");
+            return;
+        }
+
+        if (killed > 0)
+            log($"[CloudMate] stopped {killed} watch process{(killed == 1 ? "" : "es")} left by a closed Visual Studio session.");
+    }
+
+    private static bool IsLiveVisualStudio(int processId)
+    {
+        if (processId <= 0)
+            return false;
+
+        try
+        {
+            using Process process = Process.GetProcessById(processId);
+            return string.Equals(process.ProcessName, "devenv", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static int ToInt(object? value)
+    {
+        try { return value is null ? 0 : Convert.ToInt32(value); }
+        catch { return 0; }
     }
 
     /// <summary>

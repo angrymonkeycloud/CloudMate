@@ -17,6 +17,12 @@ internal static class LessCompiler
     };
     private static Engine? _engine;
 
+    /// <summary>
+    /// Imports resolved during the compile currently holding <see cref="_lock"/>, collected so watch
+    /// sessions know which partials a stylesheet depends on. Null outside a compile.
+    /// </summary>
+    private static HashSet<string>? _resolvedImports;
+
     private const string BrowserShims =
         """
         // Jint's Error.prototype.stack accessor strictly requires a string value. less.js assigns
@@ -140,6 +146,13 @@ internal static class LessCompiler
 
     /// <summary>Compiles a single LESS file to CSS.</summary>
     public static string Compile(string filePath, bool sourceMap)
+        => Compile(filePath, sourceMap, out _);
+
+    /// <summary>
+    /// Compiles a single LESS file to CSS and reports every file it imported, so callers can rebuild
+    /// this entry when one of its partials changes. Not set when the compile throws.
+    /// </summary>
+    public static string Compile(string filePath, bool sourceMap, out IReadOnlyCollection<string> importedFiles)
     {
         lock (_lock)
         {
@@ -162,13 +175,24 @@ internal static class LessCompiler
                 filename = fullPath
             });
 
-            string resultJson = engine.Invoke("__cm_less_compile", requestJson).AsString();
-            JsonElement result = JsonDocument.Parse(resultJson).RootElement;
+            HashSet<string> imports = new(StringComparer.OrdinalIgnoreCase);
+            _resolvedImports = imports;
 
-            if (result.TryGetProperty("error", out JsonElement error) && error.ValueKind == JsonValueKind.String)
-                throw new InvalidOperationException(error.GetString());
+            try
+            {
+                string resultJson = engine.Invoke("__cm_less_compile", requestJson).AsString();
+                JsonElement result = JsonDocument.Parse(resultJson).RootElement;
 
-            return result.GetProperty("css").GetString() ?? string.Empty;
+                if (result.TryGetProperty("error", out JsonElement error) && error.ValueKind == JsonValueKind.String)
+                    throw new InvalidOperationException(error.GetString());
+
+                importedFiles = imports;
+                return result.GetProperty("css").GetString() ?? string.Empty;
+            }
+            finally
+            {
+                _resolvedImports = null;
+            }
         }
     }
 
@@ -247,12 +271,20 @@ internal static class LessCompiler
         candidate = Path.GetFullPath(candidate);
 
         if (File.Exists(candidate))
-            return candidate.Replace('\\', '/');
+            return Resolved(candidate);
 
         if (!Path.HasExtension(candidate) && File.Exists($"{candidate}.less"))
-            return $"{candidate.Replace('\\', '/')}.less";
+            return Resolved($"{candidate}.less");
 
         return null;
+    }
+
+    /// <summary>Records a resolved local import for the current compile and returns its less.js path form.</summary>
+    private static string Resolved(string localPath)
+    {
+        _resolvedImports?.Add(localPath);
+
+        return localPath.Replace('\\', '/');
     }
 
     private static Uri AppendExtension(Uri uri, string? extension)

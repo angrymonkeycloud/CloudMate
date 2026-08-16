@@ -209,6 +209,10 @@ internal abstract class VsCommandBase
         });
     }
 
+    /// <summary>
+    /// Makes sure this project is covered by the always-on watch, keeping every other project that is
+    /// already watched. A command run in one project must never stop watching another.
+    /// </summary>
     protected void EnsureAlwaysWatching(string workingDirectory)
     {
         // Only start watch if the config file actually exists —
@@ -221,7 +225,7 @@ internal abstract class VsCommandBase
         {
             try
             {
-                MateRunner.EnsureWatch(
+                MateRunner.EnsureWatchIncludes(
                     workingDirectory,
                     line => CloudMatePackage.OutputLine(package, line),
                     line => CloudMatePackage.OutputLine(package, line));

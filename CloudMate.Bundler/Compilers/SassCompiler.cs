@@ -13,6 +13,12 @@ internal static class SassCompiler
     private static readonly object _lock = new();
     private static Engine? _engine;
 
+    /// <summary>
+    /// Files loaded during the compile currently holding <see cref="_lock"/>, collected so watch
+    /// sessions know which partials a stylesheet depends on. Null outside a compile.
+    /// </summary>
+    private static HashSet<string>? _loadedImports;
+
     /// <summary>Minimal polyfills for browser globals dart-sass expects (Jint has no URL/TextEncoder built-ins).</summary>
     private const string Polyfills =
         """
@@ -204,6 +210,13 @@ internal static class SassCompiler
 
     /// <summary>Compiles a single SCSS/SASS file to CSS. Returns CSS with an optional inline source map.</summary>
     public static string Compile(string filePath, bool sourceMap)
+        => Compile(filePath, sourceMap, out _);
+
+    /// <summary>
+    /// Compiles a single SCSS/SASS file to CSS and reports every file it imported, so callers can rebuild
+    /// this entry when one of its partials changes. Not set when the compile throws.
+    /// </summary>
+    public static string Compile(string filePath, bool sourceMap, out IReadOnlyCollection<string> importedFiles)
     {
         lock (_lock)
         {
@@ -219,7 +232,20 @@ internal static class SassCompiler
                 sourceMap
             });
 
-            string resultJson = engine.Invoke("__cm_sass_compile", requestJson).AsString();
+            HashSet<string> imports = new(StringComparer.OrdinalIgnoreCase);
+            _loadedImports = imports;
+
+            string resultJson;
+
+            try
+            {
+                resultJson = engine.Invoke("__cm_sass_compile", requestJson).AsString();
+            }
+            finally
+            {
+                _loadedImports = null;
+            }
+
             JsonElement result = JsonDocument.Parse(resultJson).RootElement;
 
             if (result.TryGetProperty("error", out JsonElement error) && error.ValueKind == JsonValueKind.String)
@@ -233,6 +259,7 @@ internal static class SassCompiler
                 css += $"\n/*# sourceMappingURL=data:application/json;base64,{encoded} */";
             }
 
+            importedFiles = imports;
             return css;
         }
     }
@@ -369,6 +396,8 @@ internal static class SassCompiler
 
         if (!File.Exists(path))
             return null;
+
+        _loadedImports?.Add(path);
 
         string syntax = path.EndsWith(".sass", StringComparison.OrdinalIgnoreCase)
             ? "indented"

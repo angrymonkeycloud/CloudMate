@@ -45,6 +45,8 @@
 
   <ItemGroup>
     <Reference Include="System.Design" />
+    <!-- Win32_Process command lines: used to clean up watch processes left by closed VS sessions -->
+    <Reference Include="System.Management" />
   </ItemGroup>
 
   <!-- Build and package the supported .NET CLI with the extension. The VSIX must never

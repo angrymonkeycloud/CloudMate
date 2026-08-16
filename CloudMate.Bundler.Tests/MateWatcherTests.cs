@@ -315,6 +315,115 @@ public class MateWatcherTests
     }
 
     [Fact]
+    public void ImportedStyleChange_RebuildsOnlyTheEntriesThatImportIt()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", """
+            {
+              "builds": [ { "name": "dev", "css": { "minify": false } } ],
+              "files": [
+                { "input": "shared.less", "output": "dist/shared.css" },
+                { "input": "standalone.less", "output": "dist/standalone.css" }
+              ]
+            }
+            """);
+        string importPath = dir.WriteFile(Path.Combine("styles", "_variables.less"), "@brand: red;\n");
+        dir.WriteFile("shared.less", "@import \"styles/_variables\";\n.shared { color: @brand; }\n");
+        dir.WriteFile("standalone.less", ".standalone { color: green; }\n");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+
+        // The initial build records which entry actually imports the partial.
+        MateBundler.Execute(config);
+
+        string dependentOutput = dir.Combine(Path.Combine("dist", "shared.css"));
+        string unrelatedOutput = dir.Combine(Path.Combine("dist", "standalone.css"));
+        Assert.True(File.Exists(dependentOutput));
+        Assert.True(File.Exists(unrelatedOutput));
+
+        using MateWatcher watcher = new(config);
+        Thread.Sleep(250);
+
+        // A missing output makes an unwanted rebuild unmistakable.
+        File.Delete(unrelatedOutput);
+        File.WriteAllText(importPath, "@brand: blue;\n");
+
+        bool rebuilt = false;
+        for (int i = 0; i < 40; i++)
+        {
+            if (File.Exists(dependentOutput) && File.ReadAllText(dependentOutput).Contains("blue"))
+            {
+                rebuilt = true;
+                break;
+            }
+
+            Thread.Sleep(250);
+        }
+
+        Assert.True(rebuilt, "Expected the entry importing the partial to rebuild.");
+
+        // Give a stray rebuild of the unrelated entry time to appear before asserting it never happened.
+        Thread.Sleep(1000);
+        Assert.False(File.Exists(unrelatedOutput),
+            "Editing a partial must not recompile entries that do not import it.");
+    }
+
+    [Fact]
+    public void ImportedScssChange_RebuildsEntryFromDifferentFolder()
+    {
+        using TempDirectory dir = new();
+        dir.WriteFile(".mateconfig.json", """
+            {
+              "builds": [ { "name": "dev", "css": { "minify": false } } ],
+              "files": [
+                {
+                  "input": "styles/pages/site.scss",
+                  "output": "dist/site.css"
+                }
+              ]
+            }
+            """);
+        string importPath = dir.WriteFile(Path.Combine("styles", "shared", "_variables.scss"), "$brand: red;\n");
+        dir.WriteFile(Path.Combine("styles", "pages", "site.scss"),
+            "@use \"../shared/variables\" as v;\n.site { color: v.$brand; }\n");
+
+        MateConfig config = MateConfig.Get(dir.Path);
+        MateBundler.Execute(config);
+
+        List<string> errors = [];
+        Action<string> originalLogError = MateWatcher.LogError;
+        MateWatcher.LogError = errors.Add;
+
+        using MateWatcher watcher = new(config);
+
+        try
+        {
+            Thread.Sleep(250);
+            File.WriteAllText(importPath, "$brand: blue;\n");
+
+            string outputPath = dir.Combine(Path.Combine("dist", "site.css"));
+            bool rebuilt = false;
+
+            for (int i = 0; i < 60; i++)
+            {
+                if (File.Exists(outputPath) && File.ReadAllText(outputPath).Contains("blue"))
+                {
+                    rebuilt = true;
+                    break;
+                }
+
+                Thread.Sleep(250);
+            }
+
+            Assert.True(rebuilt, $"Expected an imported SCSS change to rebuild its configured entry. Errors: {string.Join("; ", errors)}");
+        }
+        finally
+        {
+            MateWatcher.LogError = originalLogError;
+        }
+    }
+
+    [Fact]
     public void ImportedLessChange_RebuildsEntryFromDifferentFolder()
     {
         using TempDirectory dir = new();

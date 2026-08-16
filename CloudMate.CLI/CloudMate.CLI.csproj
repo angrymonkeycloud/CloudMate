@@ -10,7 +10,7 @@
 		<Authors>Angry Monkey</Authors>
 		<Company>Angry Monkey</Company>
 		<Description>CloudMate CLI — compile, bundle, compress, and watch web assets.</Description>
-		<Version>1.3.5</Version>
+		<Version>1.4.0</Version>
 		<AssemblyVersion>$(PackageVersion)</AssemblyVersion>
 		<FileVersion>$(PackageVersion)</FileVersion>
 		<!-- dotnet tool metadata -->

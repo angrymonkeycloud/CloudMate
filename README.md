@@ -553,12 +553,26 @@ mate -a, --all        # run all defined builds
 mate -w, --watch      # watch inputs and re-build on change
 mate -c, --clean      # remove entries with missing input files from mateconfig.json
 mate --autoconfig     # clean config then add all unconfigured .ts/.less/.scss/.sass files
+mate --input FILE     # compile only the config entries containing FILE
 mate -v, --version    # print CloudMate version
 mate -h, --help       # print help
 ```
 
 > **`--autoconfig`** always runs a clean pass first, so stale entries with deleted source files are
 > removed before new files are discovered and registered.
+
+#### Watching several projects with one process
+
+`--watch` accepts a repeatable `--root` so a single process watches every project of a solution. The
+compiler engines are shared, which makes one process far lighter than one per project:
+
+```bash
+mate --watch --root src/Web --root src/Components
+```
+
+A project whose configuration is missing or invalid is reported and skipped; the other projects keep
+watching. Add `--parent-pid N` and the watch exits as soon as process `N` does — editors use this so a
+watch can never outlive the IDE that started it (the Visual Studio extension always passes it).
 
 ### Output Paths and the `src` / `source` Folder Convention
 

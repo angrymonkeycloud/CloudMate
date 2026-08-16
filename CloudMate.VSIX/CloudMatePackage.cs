@@ -10,6 +10,7 @@ using EnvDTE;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Threading;
 
 namespace AngryMonkey.CloudMate.VisualStudio;
 
@@ -26,9 +27,20 @@ namespace AngryMonkey.CloudMate.VisualStudio;
 [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExistsAndFullyLoaded_string, PackageAutoLoadFlags.BackgroundLoad)]
 [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionHasSingleProject_string, PackageAutoLoadFlags.BackgroundLoad)]
 [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionHasMultipleProjects_string, PackageAutoLoadFlags.BackgroundLoad)]
-public sealed class CloudMatePackage : AsyncPackage
+public sealed class CloudMatePackage : AsyncPackage, IVsSolutionEvents
 {
     public const string PackageGuidString = "A1B2C3D4-E5F6-7890-ABCD-EF1234567890";
+
+    private IVsSolution? _solution;
+    private uint _solutionEventsCookie;
+    private Timer? _watchSyncTimer;
+    private readonly object _watchSyncLock = new();
+
+    /// <summary>
+    /// Projects load one by one and each load raises an event. Waiting out a short quiet period means
+    /// a solution with many projects arms the watch once, with the complete project set.
+    /// </summary>
+    private static readonly TimeSpan WatchSyncDelay = TimeSpan.FromSeconds(2);
 
     protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
     {
@@ -46,7 +58,18 @@ public sealed class CloudMatePackage : AsyncPackage
         await Commands.CleanConfigVsCommand.InitializeAsync(this);
         await Commands.AutoConfigureVsCommand.InitializeAsync(this);
 
-        BootstrapAlwaysOnWatch();
+        // Solution events keep watch in sync with what is actually open: projects that finish loading
+        // after this point are picked up, and closing the solution stops watching.
+        if (await GetServiceAsync(typeof(SVsSolution)) is IVsSolution solution)
+        {
+            _solution = solution;
+            solution.AdviseSolutionEvents(this, out _solutionEventsCookie);
+        }
+
+        AsyncPackage package = this;
+        _ = Task.Run(() => MateRunner.KillOrphanedWatchProcesses(line => OutputLine(package, line)));
+
+        ScheduleWatchSync();
     }
 
     // ─── Output pane ─────────────────────────────────────────────────────────
@@ -104,64 +127,143 @@ public sealed class CloudMatePackage : AsyncPackage
         }).FileAndForget("CloudMate/Output");
     }
 
-    /// <summary>
-    /// Starts always-on watch once package loads, using the first discovered mateconfig.json
-    /// under the open solution. Watch self-heals in MateRunner if the process exits.
-    /// </summary>
-    private void BootstrapAlwaysOnWatch()
+    // ─── Always-on watch ─────────────────────────────────────────────────────
+
+    /// <summary>Queues a watch synchronization, coalescing the burst of events a solution load produces.</summary>
+    private void ScheduleWatchSync()
     {
-        ThreadHelper.ThrowIfNotOnUIThread();
+        lock (_watchSyncLock)
+        {
+            if (DisposalToken.IsCancellationRequested)
+                return;
+
+            if (_watchSyncTimer is null)
+                _watchSyncTimer = new Timer(_ => SyncWatch(), null, WatchSyncDelay, Timeout.InfiniteTimeSpan);
+            else
+                _watchSyncTimer.Change(WatchSyncDelay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    /// <summary>
+    /// Points the watch process at every project in the open solution that has a mateconfig file.
+    /// One process covers them all, so saving a file in any project compiles it — a solution with
+    /// several configured projects is the normal case, not an exception.
+    /// </summary>
+    private void SyncWatch()
+        => JoinableTaskFactory.RunAsync(SyncWatchAsync).FileAndForget("CloudMate/SyncWatch");
+
+    private async Task SyncWatchAsync()
+    {
+        AsyncPackage package = this;
 
         try
         {
-            if (GetService(typeof(SDTE)) is not DTE dte)
+            object? dteService = await GetServiceAsync(typeof(SDTE));
+
+            await JoinableTaskFactory.SwitchToMainThreadAsync(DisposalToken);
+
+            if (dteService is not DTE dte)
                 return;
 
-            string solutionPath = dte.Solution?.FullName ?? string.Empty;
+            string solutionPath;
+            try { solutionPath = dte.Solution?.FullName ?? string.Empty; }
+            catch { return; }
+
             if (string.IsNullOrEmpty(solutionPath))
+            {
+                MateRunner.StopWatch();
                 return;
+            }
 
-            string solutionDir = Path.GetDirectoryName(solutionPath) ?? string.Empty;
-            if (string.IsNullOrEmpty(solutionDir))
-                return;
-
+            string solutionDirectory = Path.GetDirectoryName(solutionPath) ?? string.Empty;
             List<string> projectDirectories = GetProjectDirectories(dte);
 
-            // Capture 'this' reference for use in background task
-            AsyncPackage package = this;
+            // Everything below is file IO and process startup: never do it on the UI thread.
+            await TaskScheduler.Default;
 
-            // Offload all IO and process startup to a background thread so the UI thread is never blocked.
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    string? configFile = projectDirectories
-                        .Select(ConfigWriter.GetConfigPath)
-                        .FirstOrDefault(path => path is not null)
-                        ?? ConfigWriter.GetConfigPath(solutionDir);
-                    if (configFile is null)
-                        return;
+            List<string> roots = DiscoverConfiguredProjects(projectDirectories, solutionDirectory);
 
-                    string watchDir = Path.GetDirectoryName(configFile) ?? string.Empty;
-                    if (string.IsNullOrEmpty(watchDir))
-                        return;
-
-                    MateRunner.EnsureWatch(
-                        watchDir,
-                        line => OutputLine(package, line),
-                        line => OutputLine(package, line));
-
-                    OutputLine(package, $"[CloudMate] always-on watch enabled in '{watchDir}'.");
-                }
-                catch (Exception ex)
-                {
-                    OutputLine(package, $"[CloudMate] watch bootstrap skipped: {ex.Message}");
-                }
-            });
+            MateRunner.EnsureWatch(
+                roots,
+                line => OutputLine(package, line),
+                line => OutputLine(package, line));
+        }
+        catch (OperationCanceledException)
+        {
+            // Visual Studio is shutting down.
         }
         catch (Exception ex)
         {
-            OutputLine(this, $"[CloudMate] watch bootstrap skipped: {ex.Message}");
+            OutputLine(package, $"[CloudMate] watch could not start: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Returns every directory that owns a mateconfig file: the loaded projects first, then the
+    /// solution directory and a shallow scan under it, which also covers projects Visual Studio has
+    /// not reported yet.
+    /// </summary>
+    private static List<string> DiscoverConfiguredProjects(List<string> projectDirectories, string solutionDirectory)
+    {
+        List<string> roots = new();
+
+        void Add(string? directory)
+        {
+            if (string.IsNullOrEmpty(directory)
+                || roots.Contains(directory!, StringComparer.OrdinalIgnoreCase)
+                || ConfigWriter.GetConfigPath(directory!) is null)
+                return;
+
+            roots.Add(directory!);
+        }
+
+        foreach (string directory in projectDirectories)
+            Add(directory);
+
+        if (!string.IsNullOrEmpty(solutionDirectory))
+        {
+            Add(solutionDirectory);
+
+            foreach (string directory in EnumerateDirectories(solutionDirectory, maxDepth: 4))
+                Add(directory);
+        }
+
+        return roots;
+    }
+
+    /// <summary>Directories that never contain a project of their own.</summary>
+    private static readonly HashSet<string> SkippedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", "node_modules", ".git", ".vs", ".github", "packages", "wwwroot", "TestResults", "dist"
+    };
+
+    /// <summary>Depth-limited directory walk with a hard visit budget so a huge repository cannot stall startup.</summary>
+    private static IEnumerable<string> EnumerateDirectories(string root, int maxDepth)
+    {
+        Queue<(string Directory, int Depth)> pending = new();
+        pending.Enqueue((root, 0));
+        int visited = 0;
+
+        while (pending.Count > 0 && visited < 2000)
+        {
+            (string directory, int depth) = pending.Dequeue();
+
+            if (depth >= maxDepth)
+                continue;
+
+            string[] children;
+            try { children = Directory.GetDirectories(directory); }
+            catch { continue; }
+
+            foreach (string child in children)
+            {
+                if (SkippedDirectories.Contains(Path.GetFileName(child)))
+                    continue;
+
+                visited++;
+                yield return child;
+                pending.Enqueue((child, depth + 1));
+            }
         }
     }
 
@@ -204,5 +306,75 @@ public sealed class CloudMatePackage : AsyncPackage
         catch { }
 
         return directories;
+    }
+
+    // ─── Solution events ─────────────────────────────────────────────────────
+
+    public int OnAfterOpenSolution(object pUnkReserved, int fNewSolution)
+    {
+        ScheduleWatchSync();
+        return VSConstants.S_OK;
+    }
+
+    public int OnAfterOpenProject(IVsHierarchy pHierarchy, int fAdded)
+    {
+        ScheduleWatchSync();
+        return VSConstants.S_OK;
+    }
+
+    public int OnAfterLoadProject(IVsHierarchy pStubHierarchy, IVsHierarchy pRealHierarchy)
+    {
+        ScheduleWatchSync();
+        return VSConstants.S_OK;
+    }
+
+    public int OnAfterCloseSolution(object pUnkReserved)
+    {
+        MateRunner.StopWatch();
+        return VSConstants.S_OK;
+    }
+
+    // Project removals deliberately do not re-synchronize: dropping a root would restart the watch
+    // process (and rebuild everything) for no benefit, and closing the solution already stops it.
+    public int OnQueryCloseProject(IVsHierarchy pHierarchy, int fRemoving, ref int pfCancel) => VSConstants.S_OK;
+    public int OnBeforeCloseProject(IVsHierarchy pHierarchy, int fRemoved) => VSConstants.S_OK;
+    public int OnQueryUnloadProject(IVsHierarchy pRealHierarchy, ref int pfCancel) => VSConstants.S_OK;
+    public int OnBeforeUnloadProject(IVsHierarchy pRealHierarchy, IVsHierarchy pStubHierarchy) => VSConstants.S_OK;
+    public int OnQueryCloseSolution(object pUnkReserved, ref int pfCancel) => VSConstants.S_OK;
+    public int OnBeforeCloseSolution(object pUnkReserved) => VSConstants.S_OK;
+
+    // ─── Shutdown ────────────────────────────────────────────────────────────
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            lock (_watchSyncLock)
+            {
+                _watchSyncTimer?.Dispose();
+                _watchSyncTimer = null;
+            }
+
+            if (_solution is not null && _solutionEventsCookie != 0)
+            {
+                IVsSolution solution = _solution;
+                uint cookie = _solutionEventsCookie;
+
+                _solutionEventsCookie = 0;
+                _solution = null;
+
+                ThreadHelper.JoinableTaskFactory.Run(async () =>
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    try { solution.UnadviseSolutionEvents(cookie); }
+                    catch { }
+                });
+            }
+
+            MateRunner.StopWatch();
+        }
+
+        base.Dispose(disposing);
     }
 }

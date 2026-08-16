@@ -33,6 +33,9 @@ public sealed class MateWatcher : IDisposable
     /// </summary>
     private static readonly TimeSpan FileChangeSettleDelay = TimeSpan.FromMilliseconds(200);
 
+    /// <summary>Stylesheet source extensions whose entries can import other files.</summary>
+    private static readonly string[] StyleExtensions = [".less", ".scss", ".sass"];
+
     /// <summary>Generated and tool-managed directories which are never valid source inputs.</summary>
     private static readonly string[] ExcludedPathSegments =
         ["\\bin\\", "/bin/", "\\obj\\", "/obj/", "\\node_modules\\", "/node_modules/",
@@ -40,6 +43,15 @@ public sealed class MateWatcher : IDisposable
 
     public static Action<string> Log { get; set; } = Console.WriteLine;
     public static Action<string> LogError { get; set; } = Console.Error.WriteLine;
+
+    /// <summary>The project directory this watcher is watching.</summary>
+    public string RootDirectory => _config.RootDirectory;
+
+    /// <summary>
+    /// Raised when this watch session ends because its configuration was deleted or <see cref="Stop"/>
+    /// was called. A host watching several projects uses it to know when a project drops out.
+    /// </summary>
+    public event Action<MateWatcher>? Stopped;
 
     internal int ActiveWatcherCount
     {
@@ -77,6 +89,8 @@ public sealed class MateWatcher : IDisposable
 
     private void AttachFileWatchers()
     {
+        List<(MateConfigFile File, string Build)> styleEntries = [];
+
         foreach (MateConfigFile file in _config.Files)
         {
             foreach (string buildName in file.Builds ?? ["dev"])
@@ -110,36 +124,76 @@ public sealed class MateWatcher : IDisposable
                     }, recursive, WatcherChangeTypes.Changed | WatcherChangeTypes.Created | WatcherChangeTypes.Deleted | WatcherChangeTypes.Renamed);
                 }
 
-                // LESS imports are dependencies of the configured entry but are normally not
-                // mateconfig inputs themselves. Watch every LESS file under the project so an
-                // imported partial in a sibling/different folder rebuilds this bundle as well.
-                // QueueFile's debounce coalesces this with the configured-input watcher when the
-                // changed file is the entry stylesheet itself.
-                if (file.Input.Any(IsLessInputPattern))
-                {
-                    MateConfigFile capturedFile = file;
-                    string capturedBuild = buildName;
-                    AddWatcher(_config.RootDirectory, "*.less", (_, e) =>
-                    {
-                        try
-                        {
-                            if (!IsExcludedPath(e.FullPath)
-                                && !IsBundleOutputPath(capturedFile, capturedBuild, e.FullPath))
-                                QueueFile(capturedFile, capturedBuild);
-                        }
-                        catch (Exception ex)
-                        {
-                            LogError($"LESS dependency watch error for '{e.FullPath}': {ex.Message}");
-                        }
-                    }, recursive: true,
-                    WatcherChangeTypes.Changed | WatcherChangeTypes.Created | WatcherChangeTypes.Deleted | WatcherChangeTypes.Renamed);
-                }
+                if (file.Input.Any(IsStyleInputPattern))
+                    styleEntries.Add((file, buildName));
             }
+        }
+
+        AttachStyleDependencyWatchers(styleEntries);
+    }
+
+    /// <summary>
+    /// Imported partials are dependencies of a configured entry but are normally not mateconfig
+    /// inputs themselves, and they usually live in another folder. One watcher per style extension
+    /// under the project root covers them; the import graph recorded at compile time then decides
+    /// which entries actually need to rebuild, so editing one partial never recompiles every
+    /// stylesheet in the project.
+    /// </summary>
+    private void AttachStyleDependencyWatchers(List<(MateConfigFile File, string Build)> entries)
+    {
+        foreach (string extension in StyleExtensions)
+        {
+            if (!entries.Any(entry => entry.File.Input.Any(input => HasExtension(input, extension))))
+                continue;
+
+            AddWatcher(_config.RootDirectory, $"*{extension}", (_, e) =>
+            {
+                try
+                {
+                    if (IsExcludedPath(e.FullPath))
+                        return;
+
+                    foreach ((MateConfigFile file, string buildName) in entries)
+                        if (!IsBundleOutputPath(file, buildName, e.FullPath)
+                            && DependsOnStyleFile(file, e.FullPath))
+                            QueueFile(file, buildName);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Style dependency watch error for '{e.FullPath}': {ex.Message}");
+                }
+            }, recursive: true,
+            WatcherChangeTypes.Changed | WatcherChangeTypes.Created | WatcherChangeTypes.Deleted | WatcherChangeTypes.Renamed);
         }
     }
 
-    private static bool IsLessInputPattern(string inputPattern)
-        => string.Equals(Path.GetExtension(inputPattern), ".less", StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Whether a changed stylesheet is one of the entry's own inputs or an import of one of them.
+    /// Entries whose imports are not known yet always match, so a rebuild is never missed.
+    /// </summary>
+    private bool DependsOnStyleFile(MateConfigFile file, string changedFullPath)
+    {
+        foreach (string pattern in file.Input)
+        {
+            if (!IsStyleInputPattern(pattern))
+                continue;
+
+            if (GlobResolver.IsMatch(pattern, _config.RootDirectory, changedFullPath))
+                return true;
+
+            foreach (string entryFile in GlobResolver.Resolve([pattern], _config.RootDirectory))
+                if (StyleDependencies.MayAffect(entryFile, changedFullPath))
+                    return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsStyleInputPattern(string inputPattern)
+        => StyleExtensions.Any(extension => HasExtension(inputPattern, extension));
+
+    private static bool HasExtension(string path, string extension)
+        => string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase);
 
     private void AttachConfigWatcher()
     {
@@ -375,7 +429,7 @@ public sealed class MateWatcher : IDisposable
                     return;
 
             MateConfig nextConfig = MateConfig.Get(_config.RootDirectory);
-            Log("Config changed — reloading watchers...");
+            Log($"Config changed in '{_config.RootDirectory}' — reloading watchers...");
 
             lock (_lock)
             {
@@ -396,7 +450,7 @@ public sealed class MateWatcher : IDisposable
         }
         catch (FileNotFoundException)
         {
-            Log("mateconfig.json deleted — stopping watch.");
+            Log($"mateconfig.json deleted — stopping watch in '{_config.RootDirectory}'.");
             Stop();
         }
         catch (Exception ex)
@@ -421,10 +475,13 @@ public sealed class MateWatcher : IDisposable
     /// <summary>Signals <see cref="WaitForExit"/> to return and disposes all watchers.</summary>
     public void Stop()
     {
-        Dispose();
+        bool stoppedNow = DisposeCore();
 
         MateBundler.ReleaseMemory();
         _exitSignal.Set();
+
+        if (stoppedNow)
+            Stopped?.Invoke(this);
     }
 
     private void AddWatcher(string directory, string filter, FileSystemEventHandler handler, bool recursive = false,
@@ -478,12 +535,15 @@ public sealed class MateWatcher : IDisposable
         if ((watcherType & WatcherChangeTypes.Renamed) != 0) watcher.Renamed += (_, e) => handler(_, e);
     }
 
-    public void Dispose()
+    public void Dispose() => DisposeCore();
+
+    /// <summary>Releases every watcher and timer. Returns whether this call performed the disposal.</summary>
+    private bool DisposeCore()
     {
         lock (_lock)
         {
             if (_disposed)
-                return;
+                return false;
 
             _disposed = true;
             DisposeWatchersLocked();
@@ -494,6 +554,8 @@ public sealed class MateWatcher : IDisposable
         catch { }
         try { _idleReleaseTimer.Dispose(); }
         catch { }
+
+        return true;
     }
 
     private void DisposeWatchersLocked()

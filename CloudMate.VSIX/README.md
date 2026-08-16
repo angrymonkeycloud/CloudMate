@@ -50,10 +50,12 @@ dotnet tool install -g AngryMonkey.CloudMate.CLI
 ### File Watcher
 
 - **Incremental rebuild on save** — watches all declared input files and re-runs only the affected bundle when a file changes
-- **Implicit dependency tracking** — always watches all `.less` and `.scss` files under the project root so `@import` changes trigger the right rebuild
+- **Every configured project in the solution** — all projects that contain a `mateconfig.json` are watched at once, so saving a file compiles it no matter which project it belongs to
+- **Implicit dependency tracking** — watches `.less`, `.scss`, and `.sass` files under the project root and rebuilds the entries whose recorded `@import`/`@use` graph actually contains the changed partial
 - **Config hot-reload** — detects changes to `mateconfig.json` and automatically restarts the watcher with the new configuration
 - **Config deletion detection** — stops the watcher cleanly when `mateconfig.json` is deleted; no restart is attempted until the file is recreated
 - **Image watch** — watches image input globs and re-compresses on add, change, or delete
+- **One background process, bound to your IDE** — a single low-priority process serves every watched project and exits with Visual Studio, so nothing is left running after you close it
 
 ### Configuration
 
