@@ -29,6 +29,7 @@ bool cleanMode = false;
 bool autoConfigMode = false;
 bool recompressMode = false;
 bool noInitialBuild = false;
+bool noInitialCompile = false;
 string? inputPath = null;
 int parentProcessId = 0;
 
@@ -43,7 +44,8 @@ for (int i = 0; i < args.Length; i++)
         case "-c": case "--clean":      cleanMode = true;      break;
         case "--autoconfig":            autoConfigMode = true; break;
         case "--recompress":            recompressMode = true; break;
-        case "--no-initial-build":      noInitialBuild = true; break;
+        case "--no-initial-build":      noInitialBuild = true;   break;
+        case "--no-initial-compile":    noInitialCompile = true; break;
         case "--input" when i + 1 < args.Length:
             inputPath = args[++i];
             break;
@@ -80,16 +82,19 @@ if (showHelp)
     Console.WriteLine("  mate dev dist      run dev and dist builds");
     Console.WriteLine();
     Console.WriteLine("Options:");
-    Console.WriteLine("  -a, --all          run all defined builds");
-    Console.WriteLine("  -w, --watch        watch inputs and re-build on change");
-    Console.WriteLine("  -c, --clean        remove entries with missing input files from mateconfig.json");
-    Console.WriteLine("      --autoconfig   clean config and add all unconfigured .ts/.less/.scss/.sass files");
-    Console.WriteLine("      --recompress   force re-compress all images even if output files already exist");
-    Console.WriteLine("      --input FILE   compile only config entries containing FILE");
-    Console.WriteLine("      --root DIR     with --watch: watch this project directory (repeatable)");
-    Console.WriteLine("      --parent-pid N with --watch: exit when process N exits");
-    Console.WriteLine("  -h, --help         print this help");
-    Console.WriteLine("  -v, --version      print CloudMate version");
+    Console.WriteLine("  -a, --all                 run all defined builds");
+    Console.WriteLine("  -w, --watch               watch inputs and re-build on change");
+    Console.WriteLine("  -c, --clean               remove entries with missing input files from mateconfig.json");
+    Console.WriteLine("      --autoconfig          clean config and add all unconfigured .ts/.less/.scss/.sass files");
+    Console.WriteLine("      --recompress          force re-compress all images even if output files already exist");
+    Console.WriteLine("      --input FILE          compile only config entries containing FILE");
+    Console.WriteLine("      --root DIR            with --watch: watch this project directory (repeatable)");
+    Console.WriteLine("      --parent-pid N        with --watch: exit when process N exits");
+    Console.WriteLine("      --no-initial-build    with --watch: skip the startup pass entirely");
+    Console.WriteLine("      --no-initial-compile  with --watch: skip compiling at startup, but still");
+    Console.WriteLine("                            compress images whose output is missing");
+    Console.WriteLine("  -h, --help                print this help");
+    Console.WriteLine("  -v, --version             print CloudMate version");
     return 0;
 }
 
@@ -220,11 +225,15 @@ if (watchMode)
         }
     }
 
-    // The initial build reconciles sources changed while nothing was watching them.
+    // The initial pass reconciles sources changed while nothing was watching them. Hosts that only
+    // want compilation to happen on save pass --no-initial-compile; images are still checked, because
+    // an image whose compressed output is missing has no trigger other than this pass.
     if (!noInitialBuild && !exitSignal.IsSet)
         foreach (MateConfig watchConfig in watchConfigs)
         {
-            MateBundler.Execute(watchConfig, builds);
+            if (!noInitialCompile)
+                MateBundler.Execute(watchConfig, builds);
+
             MateImageCompressor.Execute(watchConfig, recompress: recompressMode);
         }
 

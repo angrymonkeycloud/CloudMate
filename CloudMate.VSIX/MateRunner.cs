@@ -152,15 +152,23 @@ internal static class MateRunner
 
         // The watch process exits by itself when this Visual Studio instance is gone, even if VS is
         // killed without ever unloading the extension.
-        List<string> args = new() { "--watch", "--parent-pid", Process.GetCurrentProcess().Id.ToString() };
+        // --no-initial-compile: opening a solution must not rewrite compiled output the developer
+        // never asked to rebuild. Compilation happens on save (or from the context-menu commands);
+        // images are still checked at startup because a missing compressed output would otherwise
+        // stay missing until someone happens to touch the source image.
+        List<string> args = new()
+        {
+            "--watch",
+            "--no-initial-compile",
+            "--parent-pid",
+            Process.GetCurrentProcess().Id.ToString()
+        };
         foreach (string root in _watchRoots)
         {
             args.Add("--root");
             args.Add(root);
         }
 
-        // Always run the initial build. It reconciles source changes made before Visual Studio
-        // opened the solution or while the extension was still starting.
         ProcessStartInfo psi = CreateStartInfo(FindMate(), args.ToArray(), _watchRoots[0]);
 
         Process proc = new() { StartInfo = psi, EnableRaisingEvents = true };
